@@ -7,6 +7,8 @@ import { School } from "@/lib/types";
 import * as XLSX from "xlsx";
 import { Delete, Edit, Add, WhatsApp, Call, NoteAdd } from "@mui/icons-material";
 import IconButton from "@mui/material/IconButton";
+import Badge from "@mui/material/Badge";
+import CircularProgress from "@mui/material/CircularProgress";
 import NotesPanel from "@/components/NotesPanel";
 
 interface ParsedSchool {
@@ -17,6 +19,8 @@ interface ParsedSchool {
 
 export default function SchoolsManagement() {
   const [schools, setSchools] = useState<School[]>([]);
+  const [noteCounts, setNoteCounts] = useState<Record<string, number>>({});
+  const [schoolsLoading, setSchoolsLoading] = useState(false);
   const [showUpload, setShowUpload] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [editingSchool, setEditingSchool] = useState<School | null>(null);
@@ -24,6 +28,7 @@ export default function SchoolsManagement() {
     name: "",
     address: "",
     phone: "",
+    status: "new",
   });
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
@@ -36,6 +41,7 @@ export default function SchoolsManagement() {
   }, []);
 
   const fetchSchools = async () => {
+    setSchoolsLoading(true);
     try {
       const { data, error } = await supabase
         .from("schools")
@@ -43,9 +49,28 @@ export default function SchoolsManagement() {
         .order("created_at", { ascending: false });
 
       if (error) throw error;
-      setSchools(data || []);
+      const schoolList: School[] = data || [];
+      setSchools(schoolList);
+
+      // count notes for each school
+      const counts: Record<string, number> = {};
+      for (const s of schoolList) {
+        const { count, error: cntErr } = await supabase
+          .from("notes")
+          .select("id", { head: true, count: "exact" })
+          .eq("school_id", s.id);
+        if (cntErr) {
+          console.error("Error counting notes for", s.id, cntErr);
+          counts[s.id] = 0;
+        } else {
+          counts[s.id] = count || 0;
+        }
+      }
+      setNoteCounts(counts);
     } catch (err) {
       console.error("Error fetching schools:", err);
+    } finally {
+      setSchoolsLoading(false);
     }
   };
 
@@ -116,7 +141,7 @@ export default function SchoolsManagement() {
           // Insert only schools with unique phone numbers. Set valid status to satisfy DB constraint.
           const { error: insertError } = await supabase
             .from("schools")
-            .insert(schoolsToInsert.map((s) => ({ ...s, status: "active" })));
+            .insert(schoolsToInsert.map((s) => ({ ...s, status: "new" })));
 
           if (insertError) throw insertError;
 
@@ -151,6 +176,7 @@ export default function SchoolsManagement() {
             name: formData.name,
             address: formData.address,
             phone: formData.phone,
+            status: formData.status || editingSchool.status,
             updated_at: new Date().toISOString(),
           })
           .eq("id", editingSchool.id);
@@ -162,7 +188,7 @@ export default function SchoolsManagement() {
           name: formData.name,
           address: formData.address,
           phone: formData.phone,
-          status: "active",
+          status: formData.status || "new",
         });
 
         if (error) throw error;
@@ -205,6 +231,7 @@ export default function SchoolsManagement() {
       name: school.name,
       address: school.address,
       phone: school.phone,
+      status: school.status as string,
     });
     setShowForm(true);
   };
@@ -216,6 +243,7 @@ export default function SchoolsManagement() {
       name: "",
       address: "",
       phone: "",
+      status: "new",
     });
   };
 
@@ -230,6 +258,23 @@ export default function SchoolsManagement() {
 
   const callSchool = (phone: string) => {
     window.location.href = `tel:${phone}`;
+  };
+
+  const statusClass = (status: string) => {
+    switch (status) {
+      case "new":
+        return styles.statusNew;
+      case "active":
+        return styles.statusActive;
+      case "interested":
+        return styles.statusInterested;
+      case "inactive":
+        return styles.statusInactive;
+      case "not_interested":
+        return styles.statusNotInterested;
+      default:
+        return "";
+    }
   };
 
   return (
@@ -255,7 +300,10 @@ export default function SchoolsManagement() {
         <NotesPanel
           schoolId={notesSchoolId}
           schoolName={notesSchoolName}
-          onClose={() => setNotesSchoolId(null)}
+          onClose={async () => {
+            setNotesSchoolId(null);
+            await fetchSchools();
+          }}
         />
       )}
 
@@ -265,6 +313,11 @@ export default function SchoolsManagement() {
         </div>
       )}
 
+      {schoolsLoading && (
+        <div className="text-center" style={{ marginBottom: "1rem" }}>
+          <CircularProgress size={24} />
+        </div>
+      )}
       {showUpload && (
         <div style={{ marginBottom: "2rem", padding: "1rem", backgroundColor: "#f0f0f0", borderRadius: "4px" }}>
           <h3 style={{ marginBottom: "1rem" }}>Upload Schools from Excel</h3>
@@ -331,7 +384,22 @@ export default function SchoolsManagement() {
             />
           </div>
 
-          {/* Status removed - DB default is used */}
+          <div style={{ marginBottom: "1rem" }}>
+            <label>Status</label>
+            <select
+              value={formData.status}
+              onChange={(e) =>
+                setFormData({ ...formData, status: e.target.value })
+              }
+              style={{ width: "100%" }}
+              className={statusClass(formData.status)}
+            >
+              <option value="new">new</option>
+              <option value="active">active</option>
+              <option value="interested">interested</option>
+              <option value="inactive">inactive</option>
+            </select>
+          </div>
 
           <div style={{ display: "flex", gap: "1rem" }}>
             <button type="submit" disabled={loading} className="btn btn-success">
@@ -355,20 +423,58 @@ export default function SchoolsManagement() {
           <table>
             <thead>
               <tr>
+                <th>No.</th>
                 <th>School Name</th>
                 <th>Address</th>
                 <th>Phone</th>
-                {/* Status column removed */}
+                <th>Date</th>
+                <th>Status</th>
                 <th>Actions</th>
               </tr>
             </thead>
             <tbody>
-              {schools.map((school) => (
+              {schools.map((school, index) => (
                 <tr key={school.id}>
+                  <td>{index + 1}</td>
                   <td>{school.name}</td>
                   <td>{school.address}</td>
                   <td>{school.phone}</td>
-                  {/* status cell removed */}
+                  <td>{new Date(school.created_at).toLocaleDateString()}</td>
+                  <td>
+                    <select
+                      value={school.status}
+                      onChange={async (e) => {
+                        const val = e.target.value as "new" | "active" | "interested" | "inactive" | "not_interested";
+                        // optimistic UI update
+                        setSchools((prev) =>
+                          prev.map((s) =>
+                            s.id === school.id ? { ...s, status: val } : s
+                          )
+                        );
+
+                        if (val === "not_interested") {
+                          if (confirm("Marking as not interested will delete this school. Continue?")) {
+                            await handleDelete(school.id);
+                          }
+                        } else {
+                          try {
+                            await supabase
+                              .from("schools")
+                              .update({ status: val })
+                              .eq("id", school.id);
+                          } catch (err) {
+                            console.error("Error updating status", err);
+                          }
+                        }
+                      }}
+                      className={statusClass(school.status)}
+                    >
+                      <option value="new">new</option>
+                      <option value="active">active</option>
+                      <option value="interested">interested</option>
+                      <option value="not_interested">not interested</option>
+                    </select>
+                  </td>
                   <td>
                     <div style={{ display: "flex", gap: "0.25rem" }}>
                       <IconButton
@@ -388,12 +494,20 @@ export default function SchoolsManagement() {
                       <IconButton
                         size="small"
                         onClick={() => {
-                          setNotesSchoolId(school.id);
-                          setNotesSchoolName(school.name);
+                          if (!schoolsLoading) {
+                            setNotesSchoolId(school.id);
+                            setNotesSchoolName(school.name);
+                          }
                         }}
                         title="Notes"
+                        disabled={schoolsLoading}
                       >
-                        <NoteAdd fontSize="small" />
+                        <Badge
+                          badgeContent={noteCounts[school.id] || 0}
+                          color="primary"
+                        >
+                          <NoteAdd fontSize="small" />
+                        </Badge>
                       </IconButton>
                       <IconButton
                         size="small"

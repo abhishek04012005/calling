@@ -21,7 +21,7 @@ export interface School {
   name: string;
   address: string;
   phone: string;
-  status: "active" | "inactive";
+  status: "new" | "active" | "interested" | "inactive" | "not_interested";
   created_at: string;
   updated_at: string;
 }
