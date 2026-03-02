@@ -1,0 +1,11 @@
+.container {
+  max-width: 400px;
+  margin: 0 auto;
+  padding: 2rem;
+}
+.card {
+  /* reuse global card styles or override here */
+}
+.btn {
+  /* component-specific button tweaks */
+}

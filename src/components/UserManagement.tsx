@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import styles from "./UserManagement.module.css";
 import { createClient } from "@/lib/supabase";
 import { User } from "@/lib/types";
 import { Delete, Edit, Add } from "@mui/icons-material";

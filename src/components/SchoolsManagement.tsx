@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import styles from "./SchoolsManagement.module.css";
 import { createClient } from "@/lib/supabase";
 import { School } from "@/lib/types";
 import * as XLSX from "xlsx";
@@ -235,7 +236,7 @@ export default function SchoolsManagement() {
     <div className="card">
       <div className="flex-between" style={{ marginBottom: "1.5rem" }}>
         <h2>Schools Management</h2>
-        <div style={{ display: "flex", gap: "0.5rem" }}>
+        <div className={styles.actions}>
           <button
             onClick={() => setShowUpload(!showUpload)}
             className="btn btn-secondary"
@@ -251,13 +252,11 @@ export default function SchoolsManagement() {
         </div>
       </div>
       {notesSchoolId && (
-        <div style={{ marginTop: "1rem" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.5rem" }}>
-            <h3 style={{ margin: 0 }}>Notes for {notesSchoolName}</h3>
-            <button className="btn btn-secondary" onClick={() => setNotesSchoolId(null)}>Close</button>
-          </div>
-          <NotesPanel schoolId={notesSchoolId} schoolName={notesSchoolName} />
-        </div>
+        <NotesPanel
+          schoolId={notesSchoolId}
+          schoolName={notesSchoolName}
+          onClose={() => setNotesSchoolId(null)}
+        />
       )}
 
       {message && (
@@ -349,7 +348,7 @@ export default function SchoolsManagement() {
         </form>
       )}
 
-      <div style={{ overflowX: "auto" }}>
+      <div className={styles.tableWrapper}>
         {schools.length === 0 ? (
           <p className="text-muted">No schools found</p>
         ) : (

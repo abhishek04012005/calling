@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import styles from "./TaskManagement.module.css";
 import { createClient } from "@/lib/supabase";
 import { Task, User } from "@/lib/types";
 import { Delete, Edit, Add } from "@mui/icons-material";

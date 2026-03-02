@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import styles from "./LoginForm.module.css";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase";
 import { setAuthUser } from "@/context/AuthContext";
@@ -64,7 +65,7 @@ export default function LoginForm() {
   };
 
   return (
-    <div style={{ maxWidth: "400px", margin: "0 auto", padding: "2rem" }}>
+    <div className={styles.container}>
       <div className="card">
         <h1 style={{ textAlign: "center", marginBottom: "2rem" }}>
           Admin Login

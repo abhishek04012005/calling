@@ -6,15 +6,19 @@ import { Note } from "@/lib/types";
 import { Delete, Edit, Add } from "@mui/icons-material";
 import IconButton from "@mui/material/IconButton";
 import { useAuth } from "@/context/AuthContext";
+import styles from "./NotesPanel.module.css";
+
 
 interface NotesPanelProps {
   schoolId: string;
   schoolName?: string;
+  onClose?: () => void;
 }
 
 export default function NotesPanel({
   schoolId,
   schoolName = "School",
+  onClose,
 }: NotesPanelProps) {
   const [notes, setNotes] = useState<Note[]>([]);
   const [showForm, setShowForm] = useState(false);
@@ -116,16 +120,15 @@ export default function NotesPanel({
   };
 
   return (
-    <div
-      className="card"
-      style={{
-        marginTop: "1.5rem",
-        border: "2px solid #e0e0e0",
-        backgroundColor: "#fafafa",
-      }}
-    >
+    <div className={styles.overlay} onClick={onClose}>
+      <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
       <div className="flex-between" style={{ marginBottom: "1.5rem" }}>
         <h3>Notes - {schoolName}</h3>
+        {onClose && (
+          <button className="btn btn-secondary" onClick={onClose} style={{ marginRight: "0.5rem" }}>
+            Close
+          </button>
+        )}
         <button
           onClick={() => setShowForm(!showForm)}
           className="btn btn-primary"
@@ -228,6 +231,7 @@ export default function NotesPanel({
           ))}
         </div>
       )}
+      </div>
     </div>
   );
 }

@@ -1,0 +1,13 @@
+.tableWrapper {
+  overflow-x: auto;
+}
+.actions {
+  display: flex;
+  gap: 0.25rem;
+}
+.uploadPanel {
+  margin-bottom: 2rem;
+  padding: 1rem;
+  background-color: #f0f0f0;
+  border-radius: 4px;
+}
