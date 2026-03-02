@@ -4,8 +4,9 @@ import React, { useState, useEffect } from "react";
 import { createClient } from "@/lib/supabase";
 import { School } from "@/lib/types";
 import * as XLSX from "xlsx";
-import { Delete, Edit, Add, WhatsApp, Call } from "@mui/icons-material";
+import { Delete, Edit, Add, WhatsApp, Call, NoteAdd } from "@mui/icons-material";
 import IconButton from "@mui/material/IconButton";
+import NotesPanel from "@/components/NotesPanel";
 
 interface ParsedSchool {
   name: string;
@@ -25,6 +26,8 @@ export default function SchoolsManagement() {
   });
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
+  const [notesSchoolId, setNotesSchoolId] = useState<string | null>(null);
+  const [notesSchoolName, setNotesSchoolName] = useState<string>("");
   const supabase = createClient();
 
   useEffect(() => {
@@ -247,6 +250,15 @@ export default function SchoolsManagement() {
           </button>
         </div>
       </div>
+      {notesSchoolId && (
+        <div style={{ marginTop: "1rem" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.5rem" }}>
+            <h3 style={{ margin: 0 }}>Notes for {notesSchoolName}</h3>
+            <button className="btn btn-secondary" onClick={() => setNotesSchoolId(null)}>Close</button>
+          </div>
+          <NotesPanel schoolId={notesSchoolId} schoolName={notesSchoolName} />
+        </div>
+      )}
 
       {message && (
         <div className={`alert ${message.includes("Error") ? "alert-danger" : "alert-success"}`}>
@@ -373,6 +385,16 @@ export default function SchoolsManagement() {
                         title="WhatsApp"
                       >
                         <WhatsApp fontSize="small" />
+                      </IconButton>
+                      <IconButton
+                        size="small"
+                        onClick={() => {
+                          setNotesSchoolId(school.id);
+                          setNotesSchoolName(school.name);
+                        }}
+                        title="Notes"
+                      >
+                        <NoteAdd fontSize="small" />
                       </IconButton>
                       <IconButton
                         size="small"
