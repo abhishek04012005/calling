@@ -32,7 +32,7 @@ export default function Dashboard() {
     );
   }
 
-  if (!user || user.role !== "admin") {
+  if (!user) {
     return (
       <div
         style={{
@@ -43,7 +43,7 @@ export default function Dashboard() {
         }}
       >
         <h1>Access Denied</h1>
-        <p>You need admin privileges to access this dashboard.</p>
+        <p>You need to log in to access the dashboard.</p>
         <button
           className="btn btn-primary"
           onClick={() => {
@@ -68,7 +68,7 @@ export default function Dashboard() {
       <nav style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <div>
           <h1 style={{ margin: "0", color: "white", fontSize: "1.5rem" }}>
-            Admin Dashboard
+            {user.role === "admin" ? "Admin Dashboard" : "Dashboard"}
           </h1>
           <p style={{ margin: "0.25rem 0 0 0", fontSize: "0.875rem", opacity: "0.9" }}>
             Welcome, {user.name}
@@ -110,16 +110,18 @@ export default function Dashboard() {
           >
             Schools
           </button>
-          <button
-            onClick={() => setActiveTab("users")}
-            className={`btn ${activeTab === "users" ? "btn-primary" : "btn-secondary"}`}
-            style={{
-              borderRadius: "0",
-              borderBottom: activeTab === "users" ? "3px solid var(--primary-color)" : "none",
-            }}
-          >
-            Users
-          </button>
+          {user.role === "admin" && (
+            <button
+              onClick={() => setActiveTab("users")}
+              className={`btn ${activeTab === "users" ? "btn-primary" : "btn-secondary"}`}
+              style={{
+                borderRadius: "0",
+                borderBottom: activeTab === "users" ? "3px solid var(--primary-color)" : "none",
+              }}
+            >
+              Users
+            </button>
+          )}
           <button
             onClick={() => setActiveTab("tasks")}
             className={`btn ${activeTab === "tasks" ? "btn-primary" : "btn-secondary"}`}
