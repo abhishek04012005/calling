@@ -51,6 +51,10 @@ export default function LoginForm() {
 
       setAuthUser(user);
       router.push("/dashboard");
+      // Refresh page immediately after login
+      setTimeout(() => {
+        window.location.reload();
+      }, 100);
     } catch (err) {
       setError("An error occurred. Please try again.");
       console.error(err);

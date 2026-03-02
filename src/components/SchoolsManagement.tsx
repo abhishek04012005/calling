@@ -4,7 +4,7 @@ import React, { useState, useEffect } from "react";
 import { createClient } from "@/lib/supabase";
 import { School } from "@/lib/types";
 import * as XLSX from "xlsx";
-import { Delete, Edit, Add, Phone, Call } from "@mui/icons-material";
+import { Delete, Edit, Add, WhatsApp, Call } from "@mui/icons-material";
 import IconButton from "@mui/material/IconButton";
 
 interface ParsedSchool {
@@ -22,7 +22,6 @@ export default function SchoolsManagement() {
     name: "",
     address: "",
     phone: "",
-    status: "active" as "active" | "inactive",
   });
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
@@ -65,13 +64,17 @@ export default function SchoolsManagement() {
           const worksheet = workbook.Sheets[sheetName];
           const jsonData = XLSX.utils.sheet_to_json(worksheet);
 
-          // Parse and validate the data
+          // Parse and validate the data (normalize phone, keep only required fields)
           const parsedSchools: ParsedSchool[] = jsonData
-            .map((row: any) => ({
-              name: row["School Name"] || row["name"] || "",
-              address: row["Address"] || row["address"] || "",
-              phone: row["Phone Number"] || row["phone"] || "",
-            }))
+            .map((row: any) => {
+              const rawPhone = row["Phone Number"] || row["phone"] || "";
+              const phone = String(rawPhone).trim();
+              return {
+                name: row["School Name"] || row["name"] || "",
+                address: row["Address"] || row["address"] || "",
+                phone,
+              };
+            })
             .filter((school) => school.name && school.address && school.phone);
 
           if (parsedSchools.length === 0) {
@@ -80,21 +83,49 @@ export default function SchoolsManagement() {
             );
           }
 
-          // Insert into database
+          // Fetch existing phone numbers from database
+          const { data: existingSchools, error: fetchError } = await supabase
+            .from("schools")
+            .select("phone");
+
+          if (fetchError) throw fetchError;
+
+          const existingPhones = new Set(existingSchools?.map((s: { phone: any; }) => s.phone) || []);
+          
+          // Filter out schools with duplicate phone numbers
+          const schoolsToInsert: ParsedSchool[] = [];
+          const duplicatePhones: string[] = [];
+          
+          parsedSchools.forEach((school) => {
+            if (existingPhones.has(school.phone)) {
+              duplicatePhones.push(school.phone);
+            } else {
+              schoolsToInsert.push(school);
+              existingPhones.add(school.phone); // Add to set to prevent duplicates within batch
+            }
+          });
+
+          if (schoolsToInsert.length === 0) {
+            throw new Error("All phone numbers already exist in the database");
+          }
+
+          // Insert only schools with unique phone numbers. Set valid status to satisfy DB constraint.
           const { error: insertError } = await supabase
             .from("schools")
-            .insert(parsedSchools);
+            .insert(schoolsToInsert.map((s) => ({ ...s, status: "active" })));
 
           if (insertError) throw insertError;
 
-          setMessage(
-            `Successfully uploaded ${parsedSchools.length} schools`
-          );
+          let successMessage = `Successfully uploaded ${schoolsToInsert.length} schools`;
+          if (duplicatePhones.length > 0) {
+            successMessage += `. Skipped ${duplicatePhones.length} duplicate phone number(s).`;
+          }
+          
+          setMessage(successMessage);
           setShowUpload(false);
           await fetchSchools();
         } catch (err: any) {
           setMessage(`Error parsing file: ${err.message}`);
-          console.error(err);
         }
       };
       reader.readAsBinaryString(file);
@@ -116,7 +147,6 @@ export default function SchoolsManagement() {
             name: formData.name,
             address: formData.address,
             phone: formData.phone,
-            status: formData.status,
             updated_at: new Date().toISOString(),
           })
           .eq("id", editingSchool.id);
@@ -128,7 +158,7 @@ export default function SchoolsManagement() {
           name: formData.name,
           address: formData.address,
           phone: formData.phone,
-          status: formData.status,
+          status: "active",
         });
 
         if (error) throw error;
@@ -163,22 +193,7 @@ export default function SchoolsManagement() {
     }
   };
 
-  const handleStatusChange = async (schoolId: string, newStatus: string) => {
-    try {
-      const { error } = await supabase
-        .from("schools")
-        .update({
-          status: newStatus,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", schoolId);
-
-      if (error) throw error;
-      await fetchSchools();
-    } catch (err) {
-      console.error("Error updating status:", err);
-    }
-  };
+  
 
   const handleEdit = (school: School) => {
     setEditingSchool(school);
@@ -186,7 +201,6 @@ export default function SchoolsManagement() {
       name: school.name,
       address: school.address,
       phone: school.phone,
-      status: school.status,
     });
     setShowForm(true);
   };
@@ -198,7 +212,6 @@ export default function SchoolsManagement() {
       name: "",
       address: "",
       phone: "",
-      status: "active",
     });
   };
 
@@ -307,22 +320,7 @@ export default function SchoolsManagement() {
             />
           </div>
 
-          <div style={{ marginBottom: "1.5rem" }}>
-            <label>Status *</label>
-            <select
-              value={formData.status}
-              onChange={(e) =>
-                setFormData({
-                  ...formData,
-                  status: e.target.value as "active" | "inactive",
-                })
-              }
-              style={{ width: "100%" }}
-            >
-              <option value="active">Active</option>
-              <option value="inactive">Inactive</option>
-            </select>
-          </div>
+          {/* Status removed - DB default is used */}
 
           <div style={{ display: "flex", gap: "1rem" }}>
             <button type="submit" disabled={loading} className="btn btn-success">
@@ -349,7 +347,7 @@ export default function SchoolsManagement() {
                 <th>School Name</th>
                 <th>Address</th>
                 <th>Phone</th>
-                <th>Status</th>
+                {/* Status column removed */}
                 <th>Actions</th>
               </tr>
             </thead>
@@ -359,19 +357,7 @@ export default function SchoolsManagement() {
                   <td>{school.name}</td>
                   <td>{school.address}</td>
                   <td>{school.phone}</td>
-                  <td>
-                    <select
-                      value={school.status}
-                      onChange={(e) =>
-                        handleStatusChange(school.id, e.target.value)
-                      }
-                      className={`badge badge-${school.status}`}
-                      style={{ cursor: "pointer", padding: "0.25rem", borderRadius: "4px" }}
-                    >
-                      <option value="active">Active</option>
-                      <option value="inactive">Inactive</option>
-                    </select>
-                  </td>
+                  {/* status cell removed */}
                   <td>
                     <div style={{ display: "flex", gap: "0.25rem" }}>
                       <IconButton
@@ -386,7 +372,7 @@ export default function SchoolsManagement() {
                         onClick={() => openWhatsApp(school.phone)}
                         title="WhatsApp"
                       >
-                        <Phone fontSize="small" />
+                        <WhatsApp fontSize="small" />
                       </IconButton>
                       <IconButton
                         size="small"
