@@ -4,7 +4,11 @@ import React, { createContext, useContext, useEffect, useState } from "react";
 import { User, AuthSession } from "@/lib/types";
 import { createClient } from "@/lib/supabase";
 
-const AuthContext = createContext<AuthSession | undefined>(undefined);
+interface AuthContextType extends AuthSession {
+  setUser: (user: User | null) => void;
+}
+
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
@@ -17,12 +21,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     // Restore session from localStorage
     const storedUser = localStorage.getItem("authUser");
     if (storedUser) {
-      setUser(JSON.parse(storedUser));
+      try {
+        setUser(JSON.parse(storedUser));
+      } catch (err) {
+        console.error("Failed to parse stored user:", err);
+        localStorage.removeItem("authUser");
+      }
     }
     setIsLoading(false);
   }, []);
 
-  const value: AuthSession = { user, isLoading };
+  const handleSetUser = (newUser: User | null) => {
+    setUser(newUser);
+    if (newUser) {
+      localStorage.setItem("authUser", JSON.stringify(newUser));
+    } else {
+      localStorage.removeItem("authUser");
+    }
+  };
+
+  const value: AuthContextType = { user, isLoading, setUser: handleSetUser };
 
   return (
     <AuthContext.Provider value={value}>

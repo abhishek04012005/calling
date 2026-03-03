@@ -3,6 +3,7 @@ export interface User {
   email: string;
   name: string;
   role: "admin" | "user";
+  assigned_number?: string | null;
   created_at: string;
 }
 
@@ -39,4 +40,5 @@ export interface Note {
 export interface AuthSession {
   user: User | null;
   isLoading: boolean;
+  setUser?: (user: User | null) => void;
 }

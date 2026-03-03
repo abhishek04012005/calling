@@ -26,7 +26,7 @@ export default function LoginForm() {
         .from("users")
         .select("*")
         .eq("email", email)
-        .single();
+        .single() as { data: any; error: any };
 
       if (fetchError || !data) {
         setError("Invalid email or password");
@@ -48,18 +48,15 @@ export default function LoginForm() {
         name: data.name,
         role: data.role,
         created_at: data.created_at,
+        assigned_number: data.assigned_number || null,
       };
 
       setAuthUser(user);
-      router.push("/dashboard");
-      // Refresh page immediately after login
-      setTimeout(() => {
-        window.location.reload();
-      }, 100);
+      // Use replace to ensure the login page is not in the back history
+      router.replace("/dashboard");
     } catch (err) {
       setError("An error occurred. Please try again.");
       console.error(err);
-    } finally {
       setLoading(false);
     }
   };
