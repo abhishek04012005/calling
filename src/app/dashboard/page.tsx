@@ -13,7 +13,7 @@ import IconButton from "@mui/material/IconButton";
 type TabType = "users" | "tasks" | "schools" | "notes";
 
 export default function Dashboard() {
-  const { user, isLoading } = useAuth();
+  const { user, isLoading, setUser } = useAuth();
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<TabType>("schools");
   const [selectedSchoolId, setSelectedSchoolId] = useState<string>("");
@@ -58,7 +58,9 @@ export default function Dashboard() {
   }
 
   const handleLogout = () => {
+    // clear both context and storage
     setAuthUser(null);
+    setUser && setUser(null);
     router.push("/");
   };
 

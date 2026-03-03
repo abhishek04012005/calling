@@ -1,10 +1,10 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import styles from "./LoginForm.module.css";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase";
-import { setAuthUser } from "@/context/AuthContext";
+import { setAuthUser, useAuth } from "@/context/AuthContext";
 import { User } from "@/lib/types";
 
 export default function LoginForm() {
@@ -13,7 +13,15 @@ export default function LoginForm() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const router = useRouter();
+  const { user, isLoading, setUser } = useAuth();
   const supabase = createClient();
+
+  useEffect(() => {
+    // if already authenticated, send to dashboard
+    if (!isLoading && user) {
+      router.replace("/dashboard");
+    }
+  }, [user, isLoading, router]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -51,13 +59,11 @@ export default function LoginForm() {
         assigned_number: data.assigned_number || null,
       };
 
+      // update context state and localStorage
+      setUser(user);
       setAuthUser(user);
       // Use replace to ensure the login page is not in the back history
       router.replace("/dashboard");
-      // Refresh page to load updated data
-      setTimeout(() => {
-        window.location.reload();
-      }, 100);
     } catch (err) {
       setError("An error occurred. Please try again.");
       console.error(err);
