@@ -54,6 +54,10 @@ export default function LoginForm() {
       setAuthUser(user);
       // Use replace to ensure the login page is not in the back history
       router.replace("/dashboard");
+      // Refresh page to load updated data
+      setTimeout(() => {
+        window.location.reload();
+      }, 100);
     } catch (err) {
       setError("An error occurred. Please try again.");
       console.error(err);
