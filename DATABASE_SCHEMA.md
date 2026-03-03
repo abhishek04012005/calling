@@ -48,7 +48,7 @@ CREATE TABLE schools (
   name VARCHAR(255) NOT NULL,
   address TEXT NOT NULL,
   phone VARCHAR(50) NOT NULL,
-  status VARCHAR(50) DEFAULT 'new' CHECK (status IN ('completed', 'pending', 'cancelled')),
+  status VARCHAR(50) DEFAULT 'new' CHECK (status IN ('new', 'active', 'interested', 'inactive', 'not_interested', 'assigned')),
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -129,7 +129,7 @@ Stores school information uploaded or manually entered.
 | name | VARCHAR(255) | NOT NULL | School name |
 | address | TEXT | NOT NULL | Full school address |
 | phone | VARCHAR(50) | NOT NULL | School phone number |
-| status | VARCHAR(50) | DEFAULT 'active' CHECK | School status (active/inactive) |
+| status | VARCHAR(50) | DEFAULT 'new' CHECK | School status (new/active/interested/inactive/assigned/not_interested) |
 | created_at | TIMESTAMP | DEFAULT NOW() | Record creation timestamp |
 | updated_at | TIMESTAMP | DEFAULT NOW() | Last update timestamp |
 
@@ -162,6 +162,20 @@ Stores notes attached to schools.
 - `notes_school_id_idx` - For finding notes by school
 - `notes_author_id_idx` - For finding notes by author
 - `notes_created_at_idx` - For sorting by date
+
+-- ============================================
+-- USER-SCHOOL ASSIGNMENTS TABLE
+-- ============================================
+CREATE TABLE user_school_assignments (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  school_id UUID NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+  assigned_by UUID NULL REFERENCES users(id),
+  assigned_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX usa_user_id_idx ON user_school_assignments(user_id);
+CREATE INDEX usa_school_id_idx ON user_school_assignments(school_id);
 
 ## Relationships
 

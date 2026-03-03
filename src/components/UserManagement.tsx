@@ -16,6 +16,7 @@ export default function UserManagement() {
     email: "",
     password: "",
     role: "user" as "admin" | "user",
+    assigned_number: "",
   });
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
@@ -53,6 +54,7 @@ export default function UserManagement() {
             name: formData.name,
             email: formData.email,
             role: formData.role,
+            assigned_number: formData.assigned_number || null,
             ...(formData.password && { password: formData.password }),
           })
           .eq("id", editingUser.id);
@@ -66,6 +68,7 @@ export default function UserManagement() {
           email: formData.email,
           password: formData.password,
           role: formData.role,
+          assigned_number: formData.assigned_number || null,
         });
 
         if (error) throw error;
@@ -104,6 +107,7 @@ export default function UserManagement() {
       email: user.email,
       password: "",
       role: user.role,
+      assigned_number: user.assigned_number || "",
     });
     setShowForm(true);
   };
@@ -116,6 +120,7 @@ export default function UserManagement() {
       email: "",
       password: "",
       role: "user",
+      assigned_number: "",
     });
   };
 
@@ -152,6 +157,18 @@ export default function UserManagement() {
                 setFormData({ ...formData, name: e.target.value })
               }
               required
+              style={{ width: "100%" }}
+            />
+          </div>
+          <div style={{ marginBottom: "1rem" }}>
+            <label>Assigned Number</label>
+            <input
+              type="text"
+              value={formData.assigned_number}
+              onChange={(e) =>
+                setFormData({ ...formData, assigned_number: e.target.value })
+              }
+              placeholder="e.g. +1234567890"
               style={{ width: "100%" }}
             />
           </div>
@@ -225,6 +242,7 @@ export default function UserManagement() {
               <tr>
                 <th>Name</th>
                 <th>Email</th>
+                <th>Assigned #</th>
                 <th>Role</th>
                 <th>Created</th>
                 <th>Actions</th>
@@ -235,6 +253,7 @@ export default function UserManagement() {
                 <tr key={user.id}>
                   <td>{user.name}</td>
                   <td>{user.email}</td>
+                  <td>{user.assigned_number || "-"}</td>
                   <td>
                     <span
                       className={`badge ${

@@ -22,7 +22,7 @@ export interface School {
   name: string;
   address: string;
   phone: string;
-  status: "new" | "active" | "interested" | "inactive" | "not_interested";
+  status: "new" | "active" | "interested" | "inactive" | "not_interested" | "assigned";
   created_at: string;
   updated_at: string;
 }

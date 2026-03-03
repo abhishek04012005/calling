@@ -4,14 +4,17 @@ import React, { useState, useEffect } from "react";
 import styles from "./TaskManagement.module.css";
 import { createClient } from "@/lib/supabase";
 import { Task, User } from "@/lib/types";
+import { useAuth } from "@/context/AuthContext";
 import { Delete, Edit, Add } from "@mui/icons-material";
 import IconButton from "@mui/material/IconButton";
+import { Switch, FormControlLabel } from "@mui/material";
 
 export default function TaskManagement() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
+  const [showAssignedOnly, setShowAssignedOnly] = useState(false);
   const [formData, setFormData] = useState({
     user_id: "",
     title: "",
@@ -21,6 +24,7 @@ export default function TaskManagement() {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
   const supabase = createClient();
+  const { user } = useAuth();
 
   useEffect(() => {
     fetchTasks();
@@ -152,16 +156,35 @@ export default function TaskManagement() {
     return users.find((u) => u.id === userId)?.name || "Unknown";
   };
 
+  // Filter tasks based on showAssignedOnly toggle
+  const filteredTasks = showAssignedOnly && user?.id
+    ? tasks.filter((task) => task.user_id === user.id)
+    : tasks;
+
   return (
     <div className="card">
       <div className="flex-between" style={{ marginBottom: "1.5rem" }}>
         <h2>Task Management</h2>
-        <button
-          onClick={() => setShowForm(!showForm)}
-          className="btn btn-primary"
-        >
-          <Add style={{ marginRight: "0.5rem" }} /> Add Task
-        </button>
+        <div style={{ display: "flex", gap: "1rem", alignItems: "center" }}>
+          {user?.role === "admin" && (
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={showAssignedOnly}
+                  onChange={(e) => setShowAssignedOnly(e.target.checked)}
+                  size="small"
+                />
+              }
+              label="My Tasks Only"
+            />
+          )}
+          <button
+            onClick={() => setShowForm(!showForm)}
+            className="btn btn-primary"
+          >
+            <Add style={{ marginRight: "0.5rem" }} /> Add Task
+          </button>
+        </div>
       </div>
 
       {message && (
@@ -253,7 +276,7 @@ export default function TaskManagement() {
       )}
 
       <div style={{ overflowX: "auto" }}>
-        {tasks.length === 0 ? (
+        {filteredTasks.length === 0 ? (
           <p className="text-muted">No tasks found</p>
         ) : (
           <table>
@@ -267,7 +290,7 @@ export default function TaskManagement() {
               </tr>
             </thead>
             <tbody>
-              {tasks.map((task) => (
+              {filteredTasks.map((task) => (
                 <tr key={task.id}>
                   <td>{task.title}</td>
                   <td>{getUserName(task.user_id)}</td>

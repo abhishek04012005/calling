@@ -49,6 +49,10 @@
   background-color: #2196f3;
   color: #fff;
 }
+.statusAssigned {
+  background-color: #9c27b0;
+  color: #fff;
+}
 .statusInactive {
   background-color: #9e9e9e;
   color: #fff;
