@@ -3,12 +3,42 @@
 import React, { useState, useEffect } from "react";
 import styles from "./SchoolsManagement.module.css";
 import { createClient } from "@/lib/supabase";
-import { School } from "@/lib/types";
+import { School, User } from "@/lib/types";
+import { useAuth } from "@/context/AuthContext";
 import * as XLSX from "xlsx";
-import { Delete, Edit, Add, WhatsApp, Call, NoteAdd } from "@mui/icons-material";
+import {
+  Delete,
+  Edit,
+  Add,
+  WhatsApp,
+  Call,
+  NoteAdd,
+  GroupAdd,
+} from "@mui/icons-material";
 import IconButton from "@mui/material/IconButton";
 import Badge from "@mui/material/Badge";
 import CircularProgress from "@mui/material/CircularProgress";
+
+// new MUI imports
+import {
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  TextField,
+  Button,
+  Tooltip,
+  Paper,
+  Table,
+  TableHead,
+  TableBody,
+  TableRow,
+  TableCell,
+  TableContainer,
+  InputAdornment,
+  Chip,
+  Alert,
+} from "@mui/material";
 import NotesPanel from "@/components/NotesPanel";
 
 interface ParsedSchool {
@@ -24,6 +54,14 @@ export default function SchoolsManagement() {
   const [showUpload, setShowUpload] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [editingSchool, setEditingSchool] = useState<School | null>(null);
+  const [searchText, setSearchText] = useState("");
+  const [statusFilter, setStatusFilter] = useState<string>("");
+  const [editingStatusId, setEditingStatusId] = useState<string | null>(null);
+  const [showAssignmentModal, setShowAssignmentModal] = useState(false);
+  const [assignmentSchool, setAssignmentSchool] = useState<School | null>(null);
+  const [allUsers, setAllUsers] = useState<User[]>([]);
+  const [assignedUsers, setAssignedUsers] = useState<string[]>([]);
+  const [assignmentLoading, setAssignmentLoading] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
     address: "",
@@ -36,17 +74,57 @@ export default function SchoolsManagement() {
   const [notesSchoolName, setNotesSchoolName] = useState<string>("");
   const supabase = createClient();
 
+  const { user } = useAuth();
+
   useEffect(() => {
     fetchSchools();
+    if (user?.role === "admin") {
+      fetchAllUsers();
+    }
   }, []);
+
+  const fetchAllUsers = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("users")
+        .select("*")
+        .eq("role", "user")
+        .order("name", { ascending: true });
+
+      if (error) throw error;
+      setAllUsers(data || []);
+    } catch (err) {
+      console.error("Error fetching users:", err);
+    }
+  };
 
   const fetchSchools = async () => {
     setSchoolsLoading(true);
     try {
-      const { data, error } = await supabase
-        .from("schools")
-        .select("*")
-        .order("created_at", { ascending: false });
+      let query = supabase.from("schools").select("*");
+
+      // If user is not admin, only fetch assigned schools
+      if (user?.role !== "admin") {
+        const { data: assignments, error: assignError } = await supabase
+          .from("user_school_assignments")
+          .select("school_id")
+          .eq("user_id", user?.id || "");
+
+        if (assignError) throw assignError;
+        const assignedSchoolIds = assignments?.map((a: { school_id: string; }) => a.school_id) || [];
+
+        if (assignedSchoolIds.length === 0) {
+          setSchools([]);
+          setSchoolsLoading(false);
+          return;
+        }
+
+        query = query.in("id", assignedSchoolIds);
+      }
+
+      const { data, error } = await query.order("created_at", {
+        ascending: false,
+      });
 
       if (error) throw error;
       const schoolList: School[] = data || [];
@@ -117,7 +195,7 @@ export default function SchoolsManagement() {
             .from("schools")
             .select("phone");
 
-          if (fetchError) throw fetchError;
+          if (fetchError) throw fetchError;   
 
           const existingPhones = new Set(existingSchools?.map((s: { phone: any; }) => s.phone) || []);
           
@@ -260,6 +338,87 @@ export default function SchoolsManagement() {
     window.location.href = `tel:${phone}`;
   };
 
+  const openAssignmentModal = async (school: School) => {
+    setAssignmentSchool(school);
+    setAssignmentLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from("user_school_assignments")
+        .select("user_id")
+        .eq("school_id", school.id);
+
+      if (error) throw error;
+      const userIds = data?.map((d: { user_id: string; }) => d.user_id) || [];
+      setAssignedUsers(userIds);
+      setShowAssignmentModal(true);
+    } catch (err) {
+      console.error("Error fetching assignments:", err);
+      setMessage("Error loading assignments");
+    } finally {
+      setAssignmentLoading(false);
+    }
+  };
+
+  const handleToggleUser = async (userId: string) => {
+    if (!assignmentSchool) return;
+
+    const isAssigned = assignedUsers.includes(userId);
+
+    try {
+      if (isAssigned) {
+        const { error } = await supabase
+          .from("user_school_assignments")
+          .delete()
+          .eq("user_id", userId)
+          .eq("school_id", assignmentSchool.id);
+
+        if (error) throw error;
+        setAssignedUsers((prev) => prev.filter((id) => id !== userId));
+        setMessage("User unassigned successfully");
+      } else {
+        const { error } = await supabase
+          .from("user_school_assignments")
+          .insert({
+            user_id: userId,
+            school_id: assignmentSchool.id,
+            assigned_by: user?.id,
+          });
+
+        if (error) throw error;
+        setAssignedUsers((prev) => [...prev, userId]);
+        setMessage("User assigned successfully");
+      }
+    } catch (err) {
+      console.error("Error updating assignment:", err);
+      setMessage("Error updating assignment");
+    }
+  };
+
+  const closeAssignmentModal = async () => {
+    setShowAssignmentModal(false);
+    setAssignmentSchool(null);
+    setAssignedUsers([]);
+    await fetchSchools();
+  };
+
+  // returns inline style object for vibrant background and text colors
+  const statusStyle = (status: string) => {
+    switch (status) {
+      case "new":
+        return { backgroundColor: "#ffeb3b", color: "#000", fontWeight: 600 };
+      case "active":
+        return { backgroundColor: "#4caf50", color: "#fff", fontWeight: 600 };
+      case "interested":
+        return { backgroundColor: "#2196f3", color: "#fff", fontWeight: 600 };
+      case "inactive":
+        return { backgroundColor: "#9e9e9e", color: "#fff", fontWeight: 600 };
+      case "not_interested":
+        return { backgroundColor: "#f44336", color: "#fff", fontWeight: 600 };
+      default:
+        return {};
+    }
+  };
+
   const statusClass = (status: string) => {
     switch (status) {
       case "new":
@@ -277,25 +436,52 @@ export default function SchoolsManagement() {
     }
   };
 
+  const filteredSchools = schools.filter((s) => {
+    const matchesName = s.name.toLowerCase().includes(searchText.toLowerCase());
+    const matchesStatus = statusFilter ? s.status === statusFilter : true;
+    return matchesName && matchesStatus;
+  });
+
   return (
     <div className="card">
       <div className="flex-between" style={{ marginBottom: "1.5rem" }}>
         <h2>Schools Management</h2>
         <div className={styles.actions}>
-          <button
-            onClick={() => setShowUpload(!showUpload)}
-            className="btn btn-secondary"
-          >
-            Upload Excel
-          </button>
-          <button
-            onClick={() => setShowForm(!showForm)}
-            className="btn btn-primary"
-          >
-            <Add style={{ marginRight: "0.5rem" }} /> Add School
-          </button>
+          {user?.role === "admin" && (
+            <Button
+              variant="outlined"
+              startIcon={<Add />}
+              onClick={() => setShowForm(true)}
+            >
+              Add School
+            </Button>
+          )}
+          {user?.role === "admin" && (
+            <Button
+              variant="outlined"
+              onClick={() => setShowUpload(!showUpload)}
+            >
+              Upload Excel
+            </Button>
+          )}
         </div>
       </div>
+
+      {message && (
+        <Alert
+          severity={message.includes("Error") ? "error" : "success"}
+          style={{ marginBottom: "1rem" }}
+        >
+          {message}
+        </Alert>
+      )}
+
+      {schoolsLoading && (
+        <div className="text-center" style={{ marginBottom: "1rem" }}>
+          <CircularProgress size={24} />
+        </div>
+      )}
+
       {notesSchoolId && (
         <NotesPanel
           schoolId={notesSchoolId}
@@ -307,21 +493,10 @@ export default function SchoolsManagement() {
         />
       )}
 
-      {message && (
-        <div className={`alert ${message.includes("Error") ? "alert-danger" : "alert-success"}`}>
-          {message}
-        </div>
-      )}
-
-      {schoolsLoading && (
-        <div className="text-center" style={{ marginBottom: "1rem" }}>
-          <CircularProgress size={24} />
-        </div>
-      )}
       {showUpload && (
-        <div style={{ marginBottom: "2rem", padding: "1rem", backgroundColor: "#f0f0f0", borderRadius: "4px" }}>
-          <h3 style={{ marginBottom: "1rem" }}>Upload Schools from Excel</h3>
-          <p className="text-muted" style={{ marginBottom: "1rem" }}>
+        <Paper className={styles.uploadPanel} elevation={2}>
+          <h3>Upload Schools from Excel</h3>
+          <p className="text-muted">
             Column names should be: School Name, Address, Phone Number
           </p>
           <input
@@ -331,166 +506,160 @@ export default function SchoolsManagement() {
             disabled={loading}
             style={{ marginBottom: "1rem" }}
           />
-          <button
+          <Button
+            variant="contained"
+            color="secondary"
             onClick={() => setShowUpload(false)}
-            className="btn btn-secondary"
           >
             Cancel
-          </button>
-        </div>
+          </Button>
+        </Paper>
       )}
 
-      {showForm && (
-        <form onSubmit={handleSubmit} style={{ marginBottom: "2rem" }} className="card">
-          <h3 style={{ marginBottom: "1rem" }}>
-            {editingSchool ? "Edit School" : "Add New School"}
-          </h3>
+      {/* search & status filters */}
+      <div style={{ display: "flex", gap: "0.5rem", marginBottom: "1rem" }}>
+        <TextField
+          label="Search schools"
+          variant="outlined"
+          size="small"
+          value={searchText}
+          onChange={(e) => setSearchText(e.target.value)}
+          style={{ flex: 1 }}
+        />
+        <TextField
+          select
+          label="Status"
+          variant="outlined"
+          size="small"
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value)}
+          style={{ width: "150px" }}
+          SelectProps={{ native: true }}
+        >
+          <option value="">All</option>
+          <option value="new">new</option>
+          <option value="active">active</option>
+          <option value="interested">interested</option>
+          <option value="inactive">inactive</option>
+        </TextField>
+      </div>
 
-          <div style={{ marginBottom: "1rem" }}>
-            <label>School Name *</label>
-            <input
-              type="text"
-              value={formData.name}
-              onChange={(e) =>
-                setFormData({ ...formData, name: e.target.value })
-              }
-              required
-              style={{ width: "100%" }}
-            />
-          </div>
-
-          <div style={{ marginBottom: "1rem" }}>
-            <label>Address *</label>
-            <textarea
-              value={formData.address}
-              onChange={(e) =>
-                setFormData({ ...formData, address: e.target.value })
-              }
-              required
-              style={{ width: "100%" }}
-            />
-          </div>
-
-          <div style={{ marginBottom: "1rem" }}>
-            <label>Phone Number *</label>
-            <input
-              type="tel"
-              value={formData.phone}
-              onChange={(e) =>
-                setFormData({ ...formData, phone: e.target.value })
-              }
-              required
-              style={{ width: "100%" }}
-            />
-          </div>
-
-          <div style={{ marginBottom: "1rem" }}>
-            <label>Status</label>
-            <select
-              value={formData.status}
-              onChange={(e) =>
-                setFormData({ ...formData, status: e.target.value })
-              }
-              style={{ width: "100%" }}
-              className={statusClass(formData.status)}
-            >
-              <option value="new">new</option>
-              <option value="active">active</option>
-              <option value="interested">interested</option>
-              <option value="inactive">inactive</option>
-            </select>
-          </div>
-
-          <div style={{ display: "flex", gap: "1rem" }}>
-            <button type="submit" disabled={loading} className="btn btn-success">
-              {loading ? "Saving..." : "Save"}
-            </button>
-            <button
-              type="button"
-              onClick={resetForm}
-              className="btn btn-secondary"
-            >
-              Cancel
-            </button>
-          </div>
-        </form>
-      )}
-
-      <div className={styles.tableWrapper}>
-        {schools.length === 0 ? (
-          <p className="text-muted">No schools found</p>
-        ) : (
-          <table>
-            <thead>
-              <tr>
-                <th>No.</th>
-                <th>School Name</th>
-                <th>Address</th>
-                <th>Phone</th>
-                <th>Date</th>
-                <th>Status</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {schools.map((school, index) => (
-                <tr key={school.id}>
-                  <td>{index + 1}</td>
-                  <td>{school.name}</td>
-                  <td>{school.address}</td>
-                  <td>{school.phone}</td>
-                  <td>{new Date(school.created_at).toLocaleDateString()}</td>
-                  <td>
-                    <select
-                      value={school.status}
-                      onChange={async (e) => {
-                        const val = e.target.value as "new" | "active" | "interested" | "inactive" | "not_interested";
-                        // optimistic UI update
-                        setSchools((prev) =>
-                          prev.map((s) =>
-                            s.id === school.id ? { ...s, status: val } : s
-                          )
-                        );
-
-                        if (val === "not_interested") {
-                          if (confirm("Marking as not interested will delete this school. Continue?")) {
-                            await handleDelete(school.id);
-                          }
-                        } else {
-                          try {
-                            await supabase
-                              .from("schools")
-                              .update({ status: val })
-                              .eq("id", school.id);
-                          } catch (err) {
-                            console.error("Error updating status", err);
-                          }
-                        }
-                      }}
-                      className={statusClass(school.status)}
-                    >
-                      <option value="new">new</option>
-                      <option value="active">active</option>
-                      <option value="interested">interested</option>
-                      <option value="not_interested">not interested</option>
-                    </select>
-                  </td>
-                  <td>
-                    <div style={{ display: "flex", gap: "0.25rem" }}>
+      <TableContainer component={Paper} className={styles.tableWrapper}>
+        <Table>
+          <TableHead>
+            <TableRow>
+              <TableCell>No.</TableCell>
+              <TableCell>School Name</TableCell>
+              <TableCell>Address</TableCell>
+              <TableCell>Phone</TableCell>
+              <TableCell>Date</TableCell>
+              <TableCell>Status</TableCell>
+              <TableCell align="center">Actions</TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {filteredSchools.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={7} align="center">
+                  {schoolsLoading ? "" : "No schools found"}
+                </TableCell>
+              </TableRow>
+            ) : (
+              filteredSchools.map((school, index) => (
+                <TableRow key={school.id} hover>
+                  <TableCell>{index + 1}</TableCell>
+                  <TableCell>{school.name}</TableCell>
+                  <TableCell>{school.address}</TableCell>
+                  <TableCell>{school.phone}</TableCell>
+                  <TableCell>
+                    {new Date(school.created_at).toLocaleDateString()}
+                  </TableCell>
+                  <TableCell>
+                    {user?.role === "admin" ? (
+                      editingStatusId === school.id ? (
+                        <TextField
+                          select
+                          value={school.status}
+                          onChange={async (e) => {
+                            const val = e.target.value as
+                              | "new"
+                              | "active"
+                              | "interested"
+                              | "inactive"
+                              | "not_interested";
+                            // optimistic UI update
+                            setSchools((prev) =>
+                              prev.map((s) =>
+                                s.id === school.id ? { ...s, status: val } : s
+                              )
+                            );
+                            setEditingStatusId(null);
+                            if (val === "not_interested") {
+                              if (
+                                confirm(
+                                  "Marking as not interested will delete this school. Continue?"
+                                )
+                              ) {
+                                await handleDelete(school.id);
+                              }
+                            } else {
+                              try {
+                                await supabase
+                                  .from("schools")
+                                  .update({ status: val })
+                                  .eq("id", school.id);
+                              } catch (err) {
+                                console.error("Error updating status", err);
+                              }
+                            }
+                          }}
+                          size="small"
+                          variant="standard"
+                          SelectProps={{ native: true }}
+                          InputProps={{ style: statusStyle(school.status) }}
+                          onBlur={() => setEditingStatusId(null)}
+                        >
+                          <option value="new">new</option>
+                          <option value="active">active</option>
+                          <option value="interested">interested</option>
+                          <option value="inactive">inactive</option>
+                          <option value="not_interested">not interested</option>
+                        </TextField>
+                      ) : (
+                        <Chip
+                          label={school.status}
+                          className={statusClass(school.status)}
+                          size="small"
+                          onClick={() => setEditingStatusId(school.id)}
+                          style={{ ...statusStyle(school.status), cursor: "pointer" }}
+                        />
+                      )
+                    ) : (
+                      <Chip
+                        label={school.status}
+                        className={statusClass(school.status)}
+                        size="small"
+                      />
+                    )}
+                  </TableCell>
+                  <TableCell align="center">
+                    <Tooltip title="Call">
                       <IconButton
                         size="small"
                         onClick={() => callSchool(school.phone)}
-                        title="Call"
                       >
                         <Call fontSize="small" />
                       </IconButton>
+                    </Tooltip>
+                    <Tooltip title="WhatsApp">
                       <IconButton
                         size="small"
                         onClick={() => openWhatsApp(school.phone)}
-                        title="WhatsApp"
                       >
                         <WhatsApp fontSize="small" />
                       </IconButton>
+                    </Tooltip>
+                    <Tooltip title="Notes">
                       <IconButton
                         size="small"
                         onClick={() => {
@@ -499,7 +668,6 @@ export default function SchoolsManagement() {
                             setNotesSchoolName(school.name);
                           }
                         }}
-                        title="Notes"
                         disabled={schoolsLoading}
                       >
                         <Badge
@@ -509,29 +677,144 @@ export default function SchoolsManagement() {
                           <NoteAdd fontSize="small" />
                         </Badge>
                       </IconButton>
-                      <IconButton
-                        size="small"
-                        onClick={() => handleEdit(school)}
-                        title="Edit"
-                      >
-                        <Edit fontSize="small" />
-                      </IconButton>
-                      <IconButton
-                        size="small"
-                        onClick={() => handleDelete(school.id)}
-                        title="Delete"
-                        color="error"
-                      >
-                        <Delete fontSize="small" />
-                      </IconButton>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
+                    </Tooltip>
+                    {user?.role === "admin" && (
+                      <>
+                        <Tooltip title="Assign users">
+                          <IconButton
+                            size="small"
+                            onClick={() => openAssignmentModal(school)}
+                          >
+                            <GroupAdd fontSize="small" color="primary" />
+                          </IconButton>
+                        </Tooltip>
+                        <Tooltip title="Edit">
+                          <IconButton
+                            size="small"
+                            onClick={() => handleEdit(school)}
+                          >
+                            <Edit fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                        <Tooltip title="Delete">
+                          <IconButton
+                            size="small"
+                            onClick={() => handleDelete(school.id)}
+                            color="error"
+                          >
+                            <Delete fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                      </>
+                    )}
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
+      </TableContainer>
+
+      {/* Form dialog */}
+      <Dialog open={showForm} onClose={resetForm} fullWidth maxWidth="sm">
+        <form onSubmit={handleSubmit}>
+          <DialogTitle>{editingSchool ? "Edit School" : "Add New School"}</DialogTitle>
+          <DialogContent>
+            <TextField
+              label="School Name"
+              value={formData.name}
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              required
+              fullWidth
+              margin="dense"
+            />
+            <TextField
+              label="Address"
+              value={formData.address}
+              onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+              required
+              fullWidth
+              margin="dense"
+              multiline
+              rows={3}
+            />
+            <TextField
+              label="Phone Number"
+              value={formData.phone}
+              onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+              required
+              fullWidth
+              margin="dense"
+            />
+            <TextField
+              select
+              label="Status"
+              value={formData.status}
+              onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+              fullWidth
+              margin="dense"
+              SelectProps={{ native: true }}
+            >
+              <option value="new">new</option>
+              <option value="active">active</option>
+              <option value="interested">interested</option>
+              <option value="inactive">inactive</option>
+            </TextField>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={resetForm}>Cancel</Button>
+            <Button type="submit" variant="contained" disabled={loading}>
+              {loading ? "Saving..." : "Save"}
+            </Button>
+          </DialogActions>
+        </form>
+      </Dialog>
+
+      {/* Assignment dialog */}
+      <Dialog
+        open={showAssignmentModal}
+        onClose={closeAssignmentModal}
+        fullWidth
+        maxWidth="sm"
+      >
+        <DialogTitle>
+          Assign Users to "{assignmentSchool?.name}"{assignmentLoading && (
+            <CircularProgress size={20} style={{ marginLeft: "0.5rem" }} />
+          )}
+        </DialogTitle>
+        <DialogContent dividers>
+          {allUsers.length === 0 ? (
+            <p className="text-muted">No users available for assignment</p>
+          ) : (
+            allUsers.map((u) => (
+              <div
+                key={u.id}
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  padding: "0.5rem 0",
+                }}
+              >
+                <div>
+                  <p style={{ margin: 0, fontWeight: 500 }}>{u.name}</p>
+                  <p style={{ margin: "0.25rem 0 0 0", color: "#666" }}>
+                    {u.email}
+                  </p>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={assignedUsers.includes(u.id)}
+                  onChange={() => handleToggleUser(u.id)}
+                />
+              </div>
+            ))
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={closeAssignmentModal}>Close</Button>
+        </DialogActions>
+      </Dialog>
     </div>
   );
 }
