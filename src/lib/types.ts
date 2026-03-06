@@ -9,7 +9,7 @@ export interface User {
 
 export interface Task {
   id: string;
-  user_id: string;
+  user_id: string | null;
   title: string;
   description?: string;
   status: "pending" | "in_progress" | "completed";
@@ -22,7 +22,7 @@ export interface School {
   name: string;
   address: string;
   phone: string;
-  status: "new" | "active" | "interested" | "inactive" | "not_interested" | "assigned";
+  status: "new" | "active" | "interested" | "inactive" | "unassigned" | "not_interested" | "assigned";
   created_at: string;
   updated_at: string;
 }

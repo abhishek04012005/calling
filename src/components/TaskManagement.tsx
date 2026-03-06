@@ -5,7 +5,7 @@ import styles from "./TaskManagement.module.css";
 import { createClient } from "@/lib/supabase";
 import { Task, User } from "@/lib/types";
 import { useAuth } from "@/context/AuthContext";
-import { Delete, Edit, Add } from "@mui/icons-material";
+import { Delete, Edit, Add, PersonOff } from "@mui/icons-material";
 import IconButton from "@mui/material/IconButton";
 import { Switch, FormControlLabel } from "@mui/material";
 
@@ -66,7 +66,7 @@ export default function TaskManagement() {
         const { error } = await supabase
           .from("tasks")
           .update({
-            user_id: formData.user_id,
+            user_id: formData.user_id || null,
             title: formData.title,
             description: formData.description,
             status: formData.status,
@@ -78,7 +78,7 @@ export default function TaskManagement() {
         setMessage("Task updated successfully");
       } else {
         const { error } = await supabase.from("tasks").insert({
-          user_id: formData.user_id,
+          user_id: formData.user_id || null,
           title: formData.title,
           description: formData.description,
           status: formData.status,
@@ -113,6 +113,24 @@ export default function TaskManagement() {
     }
   };
 
+  const handleUnassign = async (taskId: string) => {
+    if (!confirm("Are you sure you want to unassign this task?")) return;
+
+    try {
+      const { error } = await supabase
+        .from("tasks")
+        .update({ user_id: null, updated_at: new Date().toISOString() })
+        .eq("id", taskId);
+
+      if (error) throw error;
+      setMessage("Task unassigned successfully");
+      await fetchTasks();
+    } catch (err) {
+      setMessage("Error unassigning task");
+      console.error(err);
+    }
+  };
+
   const handleStatusChange = async (taskId: string, newStatus: string) => {
     try {
       const { error } = await supabase
@@ -133,7 +151,7 @@ export default function TaskManagement() {
   const handleEdit = (task: Task) => {
     setEditingTask(task);
     setFormData({
-      user_id: task.user_id,
+      user_id: task.user_id || "",
       title: task.title,
       description: task.description || "",
       status: task.status,
@@ -152,7 +170,8 @@ export default function TaskManagement() {
     });
   };
 
-  const getUserName = (userId: string) => {
+  const getUserName = (userId: string | null) => {
+    if (!userId) return "Unassigned";
     return users.find((u) => u.id === userId)?.name || "Unknown";
   };
 
@@ -200,16 +219,15 @@ export default function TaskManagement() {
           </h3>
 
           <div style={{ marginBottom: "1rem" }}>
-            <label>Assign To *</label>
+            <label>Assign To (optional)</label>
             <select
               value={formData.user_id}
               onChange={(e) =>
                 setFormData({ ...formData, user_id: e.target.value })
               }
-              required
               style={{ width: "100%" }}
             >
-              <option value="">Select a user</option>
+              <option value="">Unassigned</option>
               {users.map((user) => (
                 <option key={user.id} value={user.id}>
                   {user.name}
@@ -319,6 +337,15 @@ export default function TaskManagement() {
                     >
                       <Edit fontSize="small" />
                     </IconButton>
+                    {task.user_id && (
+                      <IconButton
+                        size="small"
+                        onClick={() => handleUnassign(task.id)}
+                        title="Unassign"
+                      >
+                        <PersonOff fontSize="small" />
+                      </IconButton>
+                    )}
                     <IconButton
                       size="small"
                       onClick={() => handleDelete(task.id)}

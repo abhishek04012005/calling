@@ -61,3 +61,12 @@
   background-color: #f44336;
   color: #fff;
 }
+
+.statusUnassigned {
+  background-color: #607d8b;
+  color: #fff;
+}
+
+.statusSelect {
+  color: #000;
+}

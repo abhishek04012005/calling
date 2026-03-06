@@ -1,0 +1,80 @@
+:root{
+  --bg: #fff;
+  --muted: #f6f4f8;
+  --purple: #6b2a70;
+  --accent: #9c27b0;
+  --card-border: rgba(107,42,112,0.08);
+}
+
+.page{
+  min-height: 100vh;
+  background: linear-gradient(180deg, #fff, #fbf8fb);
+  color: #2b2b2b;
+}
+
+.header{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  padding:1rem 2rem;
+  background: linear-gradient(90deg,#fff,#fff);
+  border-bottom:1px solid #f0edf2;
+}
+.brand{
+  font-weight:700;
+  color:var(--purple);
+  font-size:1.25rem;
+}
+.userRow{display:flex;align-items:center;gap:0.5rem}
+.loggedIn{font-size:0.9rem;color:#666}
+.logoutBtn{color:var(--purple)}
+
+.container{
+  max-width:1150px;
+  margin:2rem auto;
+  padding:0 1rem 4rem 1rem;
+}
+.title{color:var(--purple);font-size:2rem;margin:0 0 0.25rem 0}
+.subtitle{margin:0 0 1.25rem 0;color:#7a6f7f}
+
+.cardsRow{display:grid;grid-template-columns:repeat(5,1fr);gap:1rem;margin:1rem 0 1.75rem 0}
+.card{background:linear-gradient(180deg,#fff,#fbf6fb);padding:1rem;border-radius:10px;box-shadow:0 6px 18px rgba(107,42,112,0.03);border:1px solid var(--card-border)}
+.cardLabel{font-size:0.75rem;color:#7a6f7f;margin-bottom:0.5rem}
+.cardValue{font-size:1.6rem;font-weight:700;color:#3a2a3a}
+.cardValue.accent{color:#0b78ff}
+.accent{color:#0b78ff}
+.highlight{color:var(--accent);font-size:1.8rem}
+.purple{background:linear-gradient(90deg,#f3e6fb,#f7f0fb);color:var(--purple)}
+.cardHighlighted{border:2px solid rgba(156,39,176,0.12);box-shadow:0 10px 30px rgba(156,39,176,0.06)}
+.cardValue.highlight{color:var(--accent);font-size:1.8rem}
+
+.controlsRow{display:flex;gap:1rem;align-items:center;margin-bottom:1rem}
+.search{flex:1;padding:0.75rem 1rem;border-radius:999px;border:1px solid #eee;background:#fff}
+.filters{display:flex;gap:0.5rem}
+.select{padding:0.55rem 0.75rem;border-radius:6px;border:1px solid #eee;background:#fff}
+
+.tableWrap{margin-top:1rem;background:#fff;border-radius:8px;padding:0.5rem;border:1px solid #f0edf2}
+.table{width:100%;border-collapse:collapse}
+.table th{padding:0.85rem 1rem;text-align:left;color:#6b5569;background:transparent;font-weight:600;border-bottom:1px solid #f0edf2}
+.table td{padding:0.9rem 1rem;border-bottom:1px solid #fbf6fb;color:#3a2a3a}
+.serviceChip{display:inline-block;padding:0.25rem 0.6rem;border-radius:18px;border:1px solid rgba(107,42,112,0.15);background:#fff;color:var(--purple);font-weight:600;font-size:0.8rem}
+.statusChip{display:inline-block;padding:0.28rem 0.6rem;border-radius:18px;background:#e9f5ff;color:#0b63b8;font-weight:700;font-size:0.8rem}
+.statusChip.purple{background:linear-gradient(90deg,#f3e6fb,#f7f0fb);color:var(--purple)}
+.sourceChip{display:inline-block;padding:0.22rem 0.5rem;border-radius:12px;background:#f5f5f7;color:#6b6b6b;font-size:0.75rem}
+.viewBtn{background:linear-gradient(180deg,var(--purple),#4a1d59);color:#fff;border:none;padding:0.45rem 0.7rem;border-radius:8px;cursor:pointer}
+
+.emptyState{max-width:600px;margin:4rem auto;padding:2rem;text-align:center;border-radius:8px;background:#fff;border:1px solid #f0edf2}
+
+.tabNav{display:flex;gap:0.5rem;margin-bottom:1.5rem;border-bottom:2px solid #f0edf2;flex-wrap:wrap}
+.tabBtn{background:none;border:none;padding:0.75rem 1rem;color:#666;cursor:pointer;font-weight:500;border-bottom:3px solid transparent;transition:all 0.2s}
+.tabBtn:hover{color:var(--purple)}
+.tabActive{color:var(--purple);border-bottom-color:var(--purple)}
+
+@media (max-width:1000px){
+  .cardsRow{grid-template-columns:repeat(2,1fr)}
+}
+
+@media (max-width:600px){
+  .cardsRow{grid-template-columns:1fr}
+  .controlsRow{flex-direction:column;align-items:stretch}
+}
