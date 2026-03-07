@@ -897,7 +897,7 @@ export default function SchoolsManagement() {
                   <TableCell>
                     {new Date(school.created_at).toLocaleDateString()}
                   </TableCell>
-                  <TableCell>
+                  <TableCell className={styles.statusColumn}>
                     {user?.role === "admin" ? (
                       <TextField
                         select
@@ -1026,7 +1026,7 @@ export default function SchoolsManagement() {
                       </TextField>
                     )}
                   </TableCell>
-                  <TableCell align="center">
+                  <TableCell align="center" className={styles.actionsColumn}>
                     <Tooltip title="Call">
                       <IconButton
                         size="small"

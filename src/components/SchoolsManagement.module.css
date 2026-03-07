@@ -104,6 +104,50 @@
   }
 }
 
+/* Status column styling */
+.statusColumn {
+  min-width: 100px;
+}
+
+/* Actions column styling */
+.actionsColumn {
+  min-width: 180px;
+  white-space: nowrap;
+}
+
+/* Mobile responsiveness */
+@media (max-width: 768px) {
+  .tableWrapper {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  .tableWrapper table {
+    min-width: 800px; /* Ensure table doesn't get too compressed */
+  }
+  
+  .tableWrapper th,
+  .tableWrapper td {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.875rem;
+  }
+  
+  .actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .actions button {
+    margin-bottom: 0.5rem;
+  }
+  
+  /* Make action buttons more touch-friendly */
+  .tableWrapper button {
+    min-width: 44px;
+    min-height: 44px;
+  }
+}
+
 /* Extra small screens */
 @media (max-width: 480px) {
   .tableWrapper th,
@@ -120,5 +164,35 @@
   /* Hide less important columns on very small screens */
   .tableWrapper .date-column {
     display: none;
+  }
+  
+  /* Ensure status column is always visible and readable on mobile */
+  .statusColumn {
+    min-width: 120px !important;
+    padding: 0.375rem 0.5rem !important;
+    font-size: 0.85rem !important;
+    white-space: normal;
+  }
+  
+  .statusColumn select,
+  .statusColumn input {
+    font-size: 0.85rem;
+  }
+  
+  /* Ensure actions column stays visible on mobile */
+  .actionsColumn {
+    min-width: 200px !important;
+    padding: 0.375rem 0.25rem !important;
+  }
+  
+  /* Make icon buttons bigger and more touch-friendly on mobile */
+  .tableWrapper svg {
+    font-size: 1.25rem !important;
+  }
+  
+  .tableWrapper button {
+    min-width: 40px !important;
+    min-height: 40px !important;
+    padding: 0.5rem !important;
   }
 }
