@@ -70,3 +70,55 @@
 .statusSelect {
   color: #000;
 }
+
+/* Mobile responsiveness */
+@media (max-width: 768px) {
+  .tableWrapper {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  .tableWrapper table {
+    min-width: 800px; /* Ensure table doesn't get too compressed */
+  }
+  
+  .tableWrapper th,
+  .tableWrapper td {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.875rem;
+  }
+  
+  .actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .actions button {
+    margin-bottom: 0.5rem;
+  }
+  
+  /* Make action buttons more touch-friendly */
+  .tableWrapper button {
+    min-width: 44px;
+    min-height: 44px;
+  }
+}
+
+/* Extra small screens */
+@media (max-width: 480px) {
+  .tableWrapper th,
+  .tableWrapper td {
+    padding: 0.125rem 0.25rem;
+    font-size: 0.75rem;
+  }
+  
+  .tableWrapper th,
+  .tableWrapper td {
+    white-space: nowrap;
+  }
+  
+  /* Hide less important columns on very small screens */
+  .tableWrapper .date-column {
+    display: none;
+  }
+}

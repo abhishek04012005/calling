@@ -442,7 +442,7 @@ export default function SchoolsManagement() {
             .eq("id", assignmentSchool.id);
           if (!statusError) {
             setSchools((prev) =>
-              prev.map((s) => (s.id === assignmentSchool.id ? { ...s, status: "unassigned" as any } : s))
+              prev.map((s) => (s.id === assignmentSchool.id ? { ...s, status: "unassigned" } : s))
             );
           }
         }
@@ -469,7 +469,7 @@ export default function SchoolsManagement() {
         } else {
           // update local state so UI reflects change immediately
           setSchools((prev) =>
-            prev.map((s) => (s.id === assignmentSchool.id ? { ...s, status: "assigned" as any } : s))
+            prev.map((s) => (s.id === assignmentSchool.id ? { ...s, status: "assigned" } : s))
           );
         }
       }
@@ -523,7 +523,7 @@ export default function SchoolsManagement() {
           console.error("Error updating schools status", updateError);
         } else {
           setSchools((prev) =>
-            prev.map((s) => (selectedSchoolIds.includes(s.id) ? { ...s, status: "assigned" as any } : s))
+            prev.map((s) => (selectedSchoolIds.includes(s.id) ? { ...s, status: "assigned" } : s))
           );
         }
       }
@@ -587,7 +587,7 @@ export default function SchoolsManagement() {
 
       if (!statusError) {
         setSchools((prev) =>
-          prev.map((s) => (selectedSchoolIds.includes(s.id) ? { ...s, status: "unassigned" as any } : s))
+          prev.map((s) => (selectedSchoolIds.includes(s.id) ? { ...s, status: "unassigned" } : s))
         );
       }
 
@@ -742,7 +742,6 @@ export default function SchoolsManagement() {
         />
         <TextField
           select
-          label="Status"
           variant="outlined"
           size="small"
           value={statusFilter}
@@ -852,7 +851,7 @@ export default function SchoolsManagement() {
               <TableCell>School Name</TableCell>
               <TableCell>Address</TableCell>
               <TableCell>Phone</TableCell>
-              <TableCell>Date</TableCell>
+              <TableCell className="date-column">Date</TableCell>
               <TableCell>Status</TableCell>
               <TableCell align="center">Actions</TableCell>
             </TableRow>
@@ -1127,11 +1126,25 @@ export default function SchoolsManagement() {
         maxWidth="sm"
       >
         <DialogTitle>
-          Assign Users to "{assignmentSchool?.name}"{assignmentLoading && (
+          Assign Users to "{assignmentSchool?.name}" 
+          {assignmentSchool && (
+            <Chip 
+              label={assignmentSchool.status} 
+              size="small" 
+              className={statusClass(assignmentSchool.status)}
+              style={{ marginLeft: '0.5rem', fontSize: '0.75rem' }}
+            />
+          )}
+          {assignmentLoading && (
             <CircularProgress size={20} style={{ marginLeft: "0.5rem" }} />
           )}
         </DialogTitle>
         <DialogContent dividers>
+          {assignmentSchool?.status === "unassigned" && (
+            <Alert severity="info" style={{ marginBottom: "1rem" }}>
+              This school is currently unassigned. Assign users below to change its status.
+            </Alert>
+          )}
           {allUsers.length === 0 ? (
             <p className="text-muted">No users available for assignment</p>
           ) : (
@@ -1179,6 +1192,9 @@ export default function SchoolsManagement() {
           )}
         </DialogTitle>
         <DialogContent dividers>
+          <Alert severity="info" style={{ marginBottom: "1rem" }}>
+            Assign users to the selected schools. Schools will automatically be marked as "assigned" when users are assigned.
+          </Alert>
           {allUsers.length === 0 ? (
             <p className="text-muted">No users available for assignment</p>
           ) : (
