@@ -760,7 +760,7 @@ export default function SchoolsManagement() {
       </div>
 
       {/* bulk action bar */}
-      {selectedSchoolIds.length > 0 && user?.role === "admin" && (
+      {selectedSchoolIds.length > 0 && (
         <Paper
           style={{ padding: "0.5rem", marginBottom: "1rem" }}
           elevation={1}
@@ -768,52 +768,56 @@ export default function SchoolsManagement() {
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <span>{selectedSchoolIds.length} school(s) selected</span>
             <div style={{ display: "flex", gap: "0.5rem" }}>
-              <Button
-                variant="outlined"
-                startIcon={<GroupAdd />}
-                onClick={async () => {
-                  // open bulk user assignment
-                  setShowBulkModal(true);
-                  setBulkLoading(true);
-                  try {
-                    const { data, error } = await supabase
-                      .from("user_school_assignments")
-                      .select("user_id, school_id")
-                      .in("school_id", selectedSchoolIds);
-                    if (error && error.code !== "PGRST205") throw error;
-                    // build map counts
-                    const countMap: Record<string, number> = {};
-                    (data || []).forEach((row: any) => {
-                      countMap[row.user_id] = (countMap[row.user_id] || 0) + 1;
-                    });
-                    const usersAll = allUsers.filter(
-                      (u) => countMap[u.id] === selectedSchoolIds.length
-                    );
-                    setBulkAssignedUsers(usersAll.map((u) => u.id));
-                  } catch (err: any) {
-                    if (err?.code === "PGRST205") {
-                      setMessage(
-                        "Assignments functionality is not available. Please create the `user_school_assignments` table in the database."
-                      );
-                    } else {
-                      console.error("Error loading bulk assignments", err);
-                      setMessage("Error loading assignments");
-                    }
-                  } finally {
-                    setBulkLoading(false);
-                  }
-                }}
-              >
-                Assign users to selected
-              </Button>
-              <Button
-                variant="outlined"
-                startIcon={<GroupRemove />}
-                onClick={handleBulkUnassignAll}
-                disabled={loading}
-              >
-                Unassign all from selected
-              </Button>
+              {user?.role === "admin" ? (
+                <>
+                  <Button
+                    variant="outlined"
+                    startIcon={<GroupAdd />}
+                    onClick={async () => {
+                      // open bulk user assignment
+                      setShowBulkModal(true);
+                      setBulkLoading(true);
+                      try {
+                        const { data, error } = await supabase
+                          .from("user_school_assignments")
+                          .select("user_id, school_id")
+                          .in("school_id", selectedSchoolIds);
+                        if (error && error.code !== "PGRST205") throw error;
+                        // build map counts
+                        const countMap: Record<string, number> = {};
+                        (data || []).forEach((row: any) => {
+                          countMap[row.user_id] = (countMap[row.user_id] || 0) + 1;
+                        });
+                        const usersAll = allUsers.filter(
+                          (u) => countMap[u.id] === selectedSchoolIds.length
+                        );
+                        setBulkAssignedUsers(usersAll.map((u) => u.id));
+                      } catch (err: any) {
+                        if (err?.code === "PGRST205") {
+                          setMessage(
+                            "Assignments functionality is not available. Please create the `user_school_assignments` table in the database."
+                          );
+                        } else {
+                          console.error("Error loading bulk assignments", err);
+                          setMessage("Error loading assignments");
+                        }
+                      } finally {
+                        setBulkLoading(false);
+                      }
+                    }}
+                  >
+                    Assign users to selected
+                  </Button>
+                  <Button
+                    variant="outlined"
+                    startIcon={<GroupRemove />}
+                    onClick={handleBulkUnassignAll}
+                    disabled={loading}
+                  >
+                    Unassign all from selected
+                  </Button>
+                </>
+              ) : null}
               <Button
                 variant="outlined"
                 color="error"
