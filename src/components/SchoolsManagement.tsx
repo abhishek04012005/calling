@@ -351,7 +351,7 @@ export default function SchoolsManagement() {
   };
 
   const openWhatsApp = (phone: string) => {
-    const message = "Hello! I'm contacting you regarding our school management.";
+    const message = "Hello! I'm contacting regarding your school.";
     const encodedMessage = encodeURIComponent(message);
     // ensure we include country code 91 if not already present
     let digits = phone.replace(/[^0-9]/g, "");
