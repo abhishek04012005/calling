@@ -939,11 +939,7 @@ export default function SchoolsManagement() {
                             }
 
                             // success: optimistic update is already done, DB updated
-                            // fetchSchools(); // removed to prevent excessive refreshing
-                            // success: optimistic update is already done, DB updated
-                            // fetchSchools(); // removed to prevent excessive refreshing
                           } catch (err) {
-                            // revert optimistic change
                             setSchools((prev) =>
                               prev.map((s) =>
                                 s.id === school.id ? { ...s, status: prevStatus } : s
@@ -972,11 +968,53 @@ export default function SchoolsManagement() {
                         <option className={styles.statusSelect} value="not_interested">not interested</option>
                       </TextField>
                     ) : (
-                      <Chip
-                        label={school.status}
-                        className={statusClass(school.status)}
+                      // allow normal users to change select as well
+                      <TextField
+                        select
+                        value={school.status}
+                        onChange={async (e) => {
+                          const val = e.target.value as
+                            | "active"
+                            | "interested"
+                            | "inactive"
+                            | "not_interested";
+                          const prevStatus = school.status;
+                          // optimistic update
+                          setSchools((prev) =>
+                            prev.map((s) =>
+                              s.id === school.id ? { ...s, status: val } : s
+                            )
+                          );
+                          try {
+                            const { error } = await supabase
+                              .from("schools")
+                              .update({ status: val })
+                              .eq("id", school.id);
+                            if (error) {
+                              setSchools((prev) =>
+                                prev.map((s) =>
+                                  s.id === school.id ? { ...s, status: prevStatus } : s
+                                )
+                              );
+                            }
+                          } catch {
+                            setSchools((prev) =>
+                              prev.map((s) =>
+                                s.id === school.id ? { ...s, status: prevStatus } : s
+                              )
+                            );
+                          }
+                        }}
                         size="small"
-                      />
+                        variant="outlined"
+                        SelectProps={{ native: true }}
+                        InputProps={{ style: statusStyle(school.status) }}
+                      >
+                        <option className={styles.statusSelect} value="active">active</option>
+                        <option className={styles.statusSelect} value="interested">interested</option>
+                        <option className={styles.statusSelect} value="inactive">inactive</option>
+                        <option className={styles.statusSelect} value="not_interested">not interested</option>
+                      </TextField>
                     )}
                   </TableCell>
                   <TableCell align="center">
