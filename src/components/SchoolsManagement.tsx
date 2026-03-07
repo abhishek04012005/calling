@@ -76,9 +76,11 @@ export default function SchoolsManagement() {
   const [message, setMessage] = useState("");
   const [notesSchoolId, setNotesSchoolId] = useState<string | null>(null);
   const [notesSchoolName, setNotesSchoolName] = useState<string>("");
-  const supabase = createClient();
+  const [statusUpdating, setStatusUpdating] = useState<string | null>(null);
 
   const { user } = useAuth();
+
+  const supabase = createClient();
 
   useEffect(() => {
     if (!user) return;
@@ -645,13 +647,6 @@ export default function SchoolsManagement() {
       const matchesName = s.name.toLowerCase().includes(searchText.toLowerCase());
       const matchesStatus = statusFilter ? s.status === statusFilter : true;
       return matchesName && matchesStatus;
-    })
-    .sort((a, b) => {
-      // push only 'not_interested' to the bottom, keep others ordered by created_at desc
-      const aNI = a.status === "not_interested" ? 1 : 0;
-      const bNI = b.status === "not_interested" ? 1 : 0;
-      if (aNI !== bNI) return aNI - bNI;
-      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
     });
 
   return (
@@ -698,9 +693,16 @@ export default function SchoolsManagement() {
         <NotesPanel
           schoolId={notesSchoolId}
           schoolName={notesSchoolName}
-          onClose={async () => {
+          onClose={() => {
             setNotesSchoolId(null);
-            await fetchSchools();
+            setNotesSchoolName("");
+            // await fetchSchools(); // removed to prevent excessive refreshing
+          }}
+          onNoteCountChange={(count) => {
+            setNoteCounts((prev) => ({
+              ...prev,
+              [notesSchoolId]: count,
+            }));
           }}
         />
       )}
@@ -902,6 +904,9 @@ export default function SchoolsManagement() {
                             | "assigned"
                             | "not_interested";
 
+                          if (statusUpdating === school.id) return; // prevent multiple updates
+
+                          setStatusUpdating(school.id);
                           const prevStatus = school.status;
 
                           // optimistic UI update
@@ -912,26 +917,6 @@ export default function SchoolsManagement() {
                           );
 
                           try {
-                            // handle destructive choice first
-                            if (val === "not_interested") {
-                              if (
-                                confirm(
-                                  "Marking as not interested will delete this school. Continue?"
-                                )
-                              ) {
-                                await handleDelete(school.id);
-                                return;
-                              } else {
-                                // user cancelled, revert
-                                setSchools((prev) =>
-                                  prev.map((s) =>
-                                    s.id === school.id ? { ...s, status: prevStatus } : s
-                                  )
-                                );
-                                return;
-                              }
-                            }
-
                             const { error } = await supabase
                               .from("schools")
                               .update({ status: val, updated_at: new Date().toISOString() })
@@ -954,8 +939,10 @@ export default function SchoolsManagement() {
                               return;
                             }
 
-                            // success: refresh list to get consistent state
-                            await fetchSchools();
+                            // success: optimistic update is already done, DB updated
+                            // fetchSchools(); // removed to prevent excessive refreshing
+                            // success: optimistic update is already done, DB updated
+                            // fetchSchools(); // removed to prevent excessive refreshing
                           } catch (err) {
                             // revert optimistic change
                             setSchools((prev) =>
@@ -965,14 +952,15 @@ export default function SchoolsManagement() {
                             );
                             console.error("Error updating status", err);
                             setMessage("Error updating status");
+                          } finally {
+                            setStatusUpdating(null);
                           }
                         }}
                         size="small"
                         variant="outlined"
                         SelectProps={{ native: true }}
                         InputProps={{ style: statusStyle(school.status) }}
-                        style={{ minWidth: "120px" }}
-                        className={styles.statusSelect}
+                        disabled={statusUpdating === school.id}
 
                       >
                         <option className={styles.statusSelect}

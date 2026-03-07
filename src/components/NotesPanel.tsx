@@ -13,12 +13,14 @@ interface NotesPanelProps {
   schoolId: string;
   schoolName?: string;
   onClose?: () => void;
+  onNoteCountChange?: (count: number) => void;
 }
 
 export default function NotesPanel({
   schoolId,
   schoolName = "School",
   onClose,
+  onNoteCountChange,
 }: NotesPanelProps) {
   const [notes, setNotes] = useState<Note[]>([]);
   const [showForm, setShowForm] = useState(false);
@@ -44,7 +46,9 @@ export default function NotesPanel({
         .order("created_at", { ascending: false });
 
       if (error) throw error;
-      setNotes(data || []);
+      const notesData = data || [];
+      setNotes(notesData);
+      onNoteCountChange?.(notesData.length);
     } catch (err) {
       console.error("Error fetching notes:", err);
     }
