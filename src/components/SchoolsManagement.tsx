@@ -353,8 +353,13 @@ export default function SchoolsManagement() {
   const openWhatsApp = (phone: string) => {
     const message = "Hello! I'm contacting you regarding our school management.";
     const encodedMessage = encodeURIComponent(message);
+    // ensure we include country code 91 if not already present
+    let digits = phone.replace(/[^0-9]/g, "");
+    if (!digits.startsWith("91")) {
+      digits = `91${digits}`;
+    }
     window.open(
-      `https://wa.me/${phone.replace(/[^0-9]/g, "")}?text=${encodedMessage}`,
+      `https://wa.me/${digits}?text=${encodedMessage}`,
       "_blank"
     );
   };
