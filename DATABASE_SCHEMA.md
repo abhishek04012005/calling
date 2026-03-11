@@ -16,6 +16,7 @@ CREATE TABLE users (
   password VARCHAR(255) NOT NULL,
   name VARCHAR(255) NOT NULL,
   role VARCHAR(50) DEFAULT 'user' CHECK (role IN ('admin', 'user')),
+  assigned_number VARCHAR(50),
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -88,6 +89,7 @@ Stores user account information and roles.
 | password | VARCHAR(255) | NOT NULL | User password (plain text - use bcrypt in production) |
 | name | VARCHAR(255) | NOT NULL | User's full name |
 | role | VARCHAR(50) | DEFAULT 'user' CHECK | Either 'admin' or 'user' |
+| assigned_number | VARCHAR(50) | NULLABLE | Phone number or identifier assigned to user |
 | created_at | TIMESTAMP | DEFAULT NOW() | Account creation timestamp |
 | updated_at | TIMESTAMP | DEFAULT NOW() | Last update timestamp |
 
