@@ -6,17 +6,32 @@ import { useAuth, setAuthUser } from "@/context/AuthContext";
 import UserManagement from "@/components/UserManagement";
 import TaskManagement from "@/components/TaskManagement";
 import SchoolsManagement from "@/components/SchoolsManagement";
-import NotesPanel from "@/components/NotesPanel";
-import { Logout } from "@mui/icons-material";
-import IconButton from "@mui/material/IconButton";
+import {
+  Logout,
+  SchoolOutlined,
+  PeopleOutlined,
+  TaskAltOutlined,
+  DashboardOutlined,
+  AdminPanelSettingsOutlined,
+} from "@mui/icons-material";
+import styles from "./dashboard.module.css";
 
-type TabType = "users" | "tasks" | "schools" | "notes";
+type TabType = "schools" | "users" | "tasks";
+
+/* ── Helper: initials from name ─────────────────────── */
+function getInitials(name: string): string {
+  return name
+    .split(" ")
+    .map((w) => w[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 2);
+}
 
 export default function Dashboard() {
   const { user, isLoading, setUser } = useAuth();
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<TabType>("schools");
-  const [selectedSchoolId, setSelectedSchoolId] = useState<string>("");
 
   useEffect(() => {
     if (!isLoading && !user) {
@@ -24,123 +39,118 @@ export default function Dashboard() {
     }
   }, [user, isLoading, router]);
 
+  /* ── Loading screen ───────────────────────────────── */
   if (isLoading) {
     return (
-      <div className="flex-center" style={{ minHeight: "100vh" }}>
-        <div className="spinner"></div>
+      <div className={styles.loadingScreen}>
+        <div className={styles.spinnerRing} />
+        <p className={styles.loadingText}>Authenticating…</p>
       </div>
     );
   }
 
+  /* ── Access denied ────────────────────────────────── */
   if (!user) {
     return (
-      <div
-        style={{
-          maxWidth: "600px",
-          margin: "2rem auto",
-          padding: "2rem",
-          textAlign: "center",
-        }}
-      >
-        <h1>Access Denied</h1>
-        <p>You need to log in to access the dashboard.</p>
-        <button
-          className="btn btn-primary"
-          onClick={() => {
-            setAuthUser(null);
-            router.push("/");
-          }}
-        >
-          Back to Login
-        </button>
+      <div className={styles.accessDenied}>
+        <div className={styles.accessCard}>
+          <div className={styles.accessIcon}>🔒</div>
+          <h1>Access Denied</h1>
+          <p>You need to be logged in to access the dashboard.</p>
+          <button
+            className={styles.backBtn}
+            onClick={() => { setAuthUser(null); router.push("/"); }}
+          >
+            Back to Login
+          </button>
+        </div>
       </div>
     );
   }
 
   const handleLogout = () => {
-    // clear both context and storage
     setAuthUser(null);
     setUser && setUser(null);
     router.push("/");
   };
 
+  /* ── Tab definitions ──────────────────────────────── */
+  const tabs: { id: TabType; label: string; icon: React.ReactNode; adminOnly?: boolean }[] = [
+    { id: "schools", label: "Schools",  icon: <SchoolOutlined    className={styles.tabIcon} /> },
+    { id: "users",   label: "Users",    icon: <PeopleOutlined    className={styles.tabIcon} />, adminOnly: true },
+    { id: "tasks",   label: "Tasks",    icon: <TaskAltOutlined   className={styles.tabIcon} /> },
+  ];
+
+  const visibleTabs = tabs.filter((t) => !t.adminOnly || user.role === "admin");
+
+  /* ── Render ───────────────────────────────────────── */
   return (
-    <div>
-      {/* Navigation Header */}
-      <nav style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <div>
-          <h1 style={{ margin: "0", color: "white", fontSize: "1.5rem" }}>
-            {user.role === "admin" ? "Admin Dashboard" : "Dashboard"}
-          </h1>
-          <p style={{ margin: "0.25rem 0 0 0", fontSize: "0.875rem", opacity: "0.9" }}>
-            Welcome, {user.name}
-          </p>
+    <div className={styles.shell}>
+
+      {/* ── Navbar ──────────────────────────────────── */}
+      <nav className={styles.navbar}>
+
+        {/* Brand */}
+        <div className={styles.brand}>
+          <div className={styles.brandIcon}>
+            {user.role === "admin"
+              ? <AdminPanelSettingsOutlined style={{ fontSize: "1.1rem" }} />
+              : <DashboardOutlined         style={{ fontSize: "1.1rem" }} />
+            }
+          </div>
+          <div className={styles.brandText}>
+            <p className={styles.brandTitle}>
+              {user.role === "admin" ? "Admin Dashboard" : "Dashboard"}
+            </p>
+            <p className={styles.brandSub}>School Management Portal</p>
+          </div>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
-          <span style={{ color: "white", fontSize: "0.875rem" }}>
-            {user.email}
-          </span>
-          <IconButton
-            onClick={handleLogout}
-            title="Logout"
-            style={{ color: "white" }}
-          >
-            <Logout />
-          </IconButton>
+
+        {/* Right side */}
+        <div className={styles.navRight}>
+
+          {/* User chip */}
+          <div className={styles.userChip}>
+            <div className={styles.userAvatar}>{getInitials(user.name)}</div>
+            <div className={styles.userInfo}>
+              <p className={styles.userName}>{user.name}</p>
+              <p className={styles.userEmail}>{user.email}</p>
+            </div>
+            <span className={`${styles.roleTag} ${user.role === "admin" ? styles.roleAdmin : styles.roleUser}`}>
+              {user.role}
+            </span>
+          </div>
+
+          {/* Logout */}
+          <button className={styles.logoutBtn} onClick={handleLogout} title="Logout">
+            <Logout style={{ fontSize: "0.95rem" }} />
+            Logout
+          </button>
+
         </div>
       </nav>
 
-      {/* Main Container */}
-      <div className="container">
-        {/* Tab Navigation */}
-        <div
-          style={{
-            display: "flex",
-            gap: "0.5rem",
-            marginBottom: "2rem",
-            borderBottom: "2px solid #e0e0e0",
-            flexWrap: "wrap",
-          }}
-        >
+      {/* ── Tab Bar ─────────────────────────────────── */}
+      <div className={styles.tabBar}>
+        {visibleTabs.map((tab) => (
           <button
-            onClick={() => setActiveTab("schools")}
-            className={`btn ${activeTab === "schools" ? "btn-primary" : "btn-secondary"}`}
-            style={{
-              borderRadius: "0",
-              borderBottom: activeTab === "schools" ? "3px solid var(--primary-color)" : "none",
-            }}
+            key={tab.id}
+            className={`${styles.tab} ${activeTab === tab.id ? styles.tabActive : ""}`}
+            onClick={() => setActiveTab(tab.id)}
           >
-            Schools
+            {tab.icon}
+            {tab.label}
           </button>
-          {user.role === "admin" && (
-            <button
-              onClick={() => setActiveTab("users")}
-              className={`btn ${activeTab === "users" ? "btn-primary" : "btn-secondary"}`}
-              style={{
-                borderRadius: "0",
-                borderBottom: activeTab === "users" ? "3px solid var(--primary-color)" : "none",
-              }}
-            >
-              Users
-            </button>
-          )}
-          <button
-            onClick={() => setActiveTab("tasks")}
-            className={`btn ${activeTab === "tasks" ? "btn-primary" : "btn-secondary"}`}
-            style={{
-              borderRadius: "0",
-              borderBottom: activeTab === "tasks" ? "3px solid var(--primary-color)" : "none",
-            }}
-          >
-            Tasks
-          </button>
-        </div>
-
-        {/* Content Area */}
-        {activeTab === "users" && <UserManagement />}
-        {activeTab === "tasks" && <TaskManagement />}
-        {activeTab === "schools" && <SchoolsManagement />}
+        ))}
       </div>
+
+      {/* ── Content ─────────────────────────────────── */}
+      <main className={styles.main}>
+        {activeTab === "schools" && <SchoolsManagement />}
+        {activeTab === "users"   && user.role === "admin" && <UserManagement />}
+        {activeTab === "tasks"   && <TaskManagement />}
+      </main>
+
     </div>
   );
 }

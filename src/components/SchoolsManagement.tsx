@@ -8,96 +8,112 @@ import { useAuth } from "@/context/AuthContext";
 import * as XLSX from "xlsx";
 import {
   Delete,
-  Edit,
+  /* Edit removed */
   Add,
   WhatsApp,
   Call,
   NoteAdd,
   GroupAdd,
   GroupRemove,
+  Search,
+  SchoolOutlined,
+  UploadFile,
+  LocationOn,
+  Close,
+  CheckCircleOutline,
+  ErrorOutline,
 } from "@mui/icons-material";
-import IconButton from "@mui/material/IconButton";
-import Badge from "@mui/material/Badge";
-import CircularProgress from "@mui/material/CircularProgress";
-
-// new MUI imports
 import {
   Dialog,
   DialogTitle,
   DialogContent,
   DialogActions,
   TextField,
-  Button,
   Tooltip,
-  Paper,
-  Table,
-  TableHead,
-  TableBody,
-  TableRow,
-  TableCell,
-  TableContainer,
-  InputAdornment,
-  Chip,
-  Alert,
+  CircularProgress,
+  Badge,
 } from "@mui/material";
 import NotesPanel from "@/components/NotesPanel";
 
+/* ── Types ──────────────────────────────────────────── */
 interface ParsedSchool {
   name: string;
   address: string;
   phone: string;
 }
 
+/* ── Helper: truncate address to first 3 words ──────── */
+function truncateAddress(address: string): string {
+  const words = address.trim().split(/\s+/);
+  if (words.length <= 3) return address;
+  return words.slice(0, 3).join(" ") + "…";
+}
+
+/* ── Status helper type ─────────────────────────────── */
+type StatusKey =
+  | "new" | "active" | "interested" | "inactive"
+  | "unassigned" | "assigned" | "not_interested";
+
+/* ── Main Component ─────────────────────────────────── */
 export default function SchoolsManagement() {
-  const [schools, setSchools] = useState<School[]>([]);
-  const [noteCounts, setNoteCounts] = useState<Record<string, number>>({});
+  const [schools, setSchools]               = useState<School[]>([]);
+  const [noteCounts, setNoteCounts]         = useState<Record<string, number>>({});
   const [schoolsLoading, setSchoolsLoading] = useState(false);
-  const [showUpload, setShowUpload] = useState(false);
-  const [showForm, setShowForm] = useState(false);
-  const [editingSchool, setEditingSchool] = useState<School | null>(null);
-  const [searchText, setSearchText] = useState("");
-  const [statusFilter, setStatusFilter] = useState<string>("");
-  const [showAssignmentModal, setShowAssignmentModal] = useState(false);
-  const [assignmentSchool, setAssignmentSchool] = useState<School | null>(null);
+  const [showUpload, setShowUpload]         = useState(false);
+  const [showForm, setShowForm]             = useState(false);
+  const [editingSchool, setEditingSchool]   = useState<School | null>(null);
+  const [searchText, setSearchText]         = useState("");
+  const [statusFilter, setStatusFilter]     = useState<string>("");
+
+  // Assignment-related data (used for bulk assignments)
   const [allUsers, setAllUsers] = useState<User[]>([]);
-  const [assignedUsers, setAssignedUsers] = useState<string[]>([]);
-  const [assignmentLoading, setAssignmentLoading] = useState(false);
+  // note: assignedUsers state removed since assignment UI gone
+
+  // Bulk
   const [selectedSchoolIds, setSelectedSchoolIds] = useState<string[]>([]);
-  const [showBulkModal, setShowBulkModal] = useState(false);
+  const [showBulkModal, setShowBulkModal]         = useState(false);
   const [bulkAssignedUsers, setBulkAssignedUsers] = useState<string[]>([]);
-  const [bulkLoading, setBulkLoading] = useState(false);
+  const [bulkLoading, setBulkLoading]             = useState(false);
+
+  // Form
   const [formData, setFormData] = useState({
-    name: "",
-    address: "",
-    phone: "",
-    status: "new",
+    name: "", address: "", phone: "", status: "new",
   });
-  const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState("");
-  const [notesSchoolId, setNotesSchoolId] = useState<string | null>(null);
+  const [loading, setLoading]   = useState(false);
+  const [message, setMessage]   = useState("");
+
+  // Notes
+  const [notesSchoolId, setNotesSchoolId]     = useState<string | null>(null);
   const [notesSchoolName, setNotesSchoolName] = useState<string>("");
+
+  // Status update guard
   const [statusUpdating, setStatusUpdating] = useState<string | null>(null);
 
-  const { user } = useAuth();
+  // Address popup
+  const [addressPopup, setAddressPopup] = useState<{ name: string; address: string } | null>(null);
 
+  const { user } = useAuth();
   const supabase = createClient();
 
+  /* ── Auto-dismiss message ─────────────────────────── */
+  useEffect(() => {
+    if (!message) return;
+    const t = setTimeout(() => setMessage(""), 4000);
+    return () => clearTimeout(t);
+  }, [message]);
+
+  /* ── Init ─────────────────────────────────────────── */
   useEffect(() => {
     if (!user) return;
     fetchSchools();
-    if (user.role === "admin") {
-      fetchAllUsers();
-    }
+    if (user.role === "admin") fetchAllUsers();
   }, [user]);
 
+  /* ── Data fetches ─────────────────────────────────── */
   const fetchAllUsers = async () => {
     try {
       const { data, error } = await supabase
-        .from("users")
-        .select("*")
-        .eq("role", "user")
-        .order("name", { ascending: true });
-
+        .from("users").select("*").eq("role", "user").order("name", { ascending: true });
       if (error) throw error;
       setAllUsers(data || []);
     } catch (err) {
@@ -106,68 +122,40 @@ export default function SchoolsManagement() {
   };
 
   const fetchSchools = async () => {
-    if (!user) {
-      // nothing to load until we know who is logged in
-      setSchools([]);
-      return;
-    }
-
+    if (!user) { setSchools([]); return; }
     setSchoolsLoading(true);
     try {
       let query = supabase.from("schools").select("*");
 
-      // If user is not admin, only fetch assigned schools or phone-matching records
       if (user.role !== "admin") {
         const { data: assignments, error: assignError } = await supabase
-          .from("user_school_assignments")
-          .select("school_id")
-          .eq("user_id", user.id);
-
+          .from("user_school_assignments").select("school_id").eq("user_id", user.id);
         if (assignError) throw assignError;
-        const assignedSchoolIds = assignments?.map((a: { school_id: string; }) => a.school_id) || [];
+        const assignedIds = assignments?.map((a: { school_id: string }) => a.school_id) || [];
 
-        // build filter string: include phone condition if assigned_number is set
-        if (assignedSchoolIds.length === 0 && !user.assigned_number) {
-          setSchools([]);
-          setSchoolsLoading(false);
-          return;
+        if (assignedIds.length === 0 && !user.assigned_number) {
+          setSchools([]); setSchoolsLoading(false); return;
         }
-
         if (user.assigned_number) {
           const phoneVal = user.assigned_number.replace(/'/g, "''");
-          if (assignedSchoolIds.length > 0) {
-            query = query.or(
-              `id.in.(${assignedSchoolIds.join(",")}),phone.eq.${phoneVal}`
-            );
-          } else {
-            query = query.eq("phone", phoneVal);
-          }
+          query = assignedIds.length > 0
+            ? query.or(`id.in.(${assignedIds.join(",")}),phone.eq.${phoneVal}`)
+            : query.eq("phone", phoneVal);
         } else {
-          query = query.in("id", assignedSchoolIds);
+          query = query.in("id", assignedIds);
         }
       }
 
-      const { data, error } = await query.order("created_at", {
-        ascending: false,
-      });
-
+      const { data, error } = await query.order("created_at", { ascending: false });
       if (error) throw error;
       const schoolList: School[] = data || [];
       setSchools(schoolList);
 
-      // count notes for each school
       const counts: Record<string, number> = {};
       for (const s of schoolList) {
-        const { count, error: cntErr } = await supabase
-          .from("notes")
-          .select("id", { head: true, count: "exact" })
-          .eq("school_id", s.id);
-        if (cntErr) {
-          console.error("Error counting notes for", s.id, cntErr);
-          counts[s.id] = 0;
-        } else {
-          counts[s.id] = count || 0;
-        }
+        const { count } = await supabase
+          .from("notes").select("id", { head: true, count: "exact" }).eq("school_id", s.id);
+        counts[s.id] = count || 0;
       }
       setNoteCounts(counts);
     } catch (err) {
@@ -177,87 +165,47 @@ export default function SchoolsManagement() {
     }
   };
 
-  const handleFileUpload = async (
-    event: React.ChangeEvent<HTMLInputElement>
-  ) => {
-    const file = event.target.files?.[0];
+  /* ── Upload ───────────────────────────────────────── */
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
     if (!file) return;
-
-    setLoading(true);
-    setMessage("");
-
+    setLoading(true); setMessage("");
     try {
       const reader = new FileReader();
-      reader.onload = async (e) => {
+      reader.onload = async (ev) => {
         try {
-          const data = e.target?.result;
-          const workbook = XLSX.read(data, { type: "binary" });
-          const sheetName = workbook.SheetNames[0];
-          const worksheet = workbook.Sheets[sheetName];
-          const jsonData = XLSX.utils.sheet_to_json(worksheet);
+          const wb = XLSX.read(ev.target?.result, { type: "binary" });
+          const ws = wb.Sheets[wb.SheetNames[0]];
+          const rows = XLSX.utils.sheet_to_json(ws);
+          const parsed: ParsedSchool[] = (rows as any[])
+            .map((r) => ({
+              name:    r["School Name"] || r["name"] || "",
+              address: r["Address"]     || r["address"] || "",
+              phone:   String(r["Phone Number"] || r["phone"] || "").trim(),
+            }))
+            .filter((s) => s.name && s.address && s.phone);
 
-          // Parse and validate the data (normalize phone, keep only required fields)
-          const parsedSchools: ParsedSchool[] = jsonData
-            .map((row: any) => {
-              const rawPhone = row["Phone Number"] || row["phone"] || "";
-              const phone = String(rawPhone).trim();
-              return {
-                name: row["School Name"] || row["name"] || "",
-                address: row["Address"] || row["address"] || "",
-                phone,
-              };
-            })
-            .filter((school) => school.name && school.address && school.phone);
+          if (!parsed.length) throw new Error("No valid data. Columns: School Name, Address, Phone Number");
 
-          if (parsedSchools.length === 0) {
-            throw new Error(
-              "No valid data found. Please ensure columns are named: School Name, Address, Phone Number"
-            );
-          }
-
-          // Fetch existing phone numbers from database
-          const { data: existingSchools, error: fetchError } = await supabase
-            .from("schools")
-            .select("phone");
-
-          if (fetchError) throw fetchError;
-
-          const existingPhones = new Set(existingSchools?.map((s: { phone: any; }) => s.phone) || []);
-
-          // Filter out schools with duplicate phone numbers
-          const schoolsToInsert: ParsedSchool[] = [];
-          const duplicatePhones: string[] = [];
-
-          parsedSchools.forEach((school) => {
-            if (existingPhones.has(school.phone)) {
-              duplicatePhones.push(school.phone);
-            } else {
-              schoolsToInsert.push(school);
-              existingPhones.add(school.phone); // Add to set to prevent duplicates within batch
-            }
+          const { data: existing } = await supabase.from("schools").select("phone");
+          const existPhones = new Set(existing?.map((s: any) => s.phone) || []);
+          const toInsert: ParsedSchool[] = [];
+          const dupes: string[] = [];
+          parsed.forEach((s) => {
+            if (existPhones.has(s.phone)) { dupes.push(s.phone); }
+            else { toInsert.push(s); existPhones.add(s.phone); }
           });
 
-          if (schoolsToInsert.length === 0) {
-            throw new Error("All phone numbers already exist in the database");
-          }
+          if (!toInsert.length) throw new Error("All phone numbers already exist");
+          const { error: ins } = await supabase.from("schools")
+            .insert(toInsert.map((s) => ({ ...s, status: "new" })));
+          if (ins) throw ins;
 
-          // Insert only schools with unique phone numbers. Set valid status to satisfy DB constraint.
-          const { error: insertError } = await supabase
-            .from("schools")
-            .insert(schoolsToInsert.map((s) => ({ ...s, status: "new" })));
-
-          if (insertError) throw insertError;
-
-          let successMessage = `Successfully uploaded ${schoolsToInsert.length} schools`;
-          if (duplicatePhones.length > 0) {
-            successMessage += `. Skipped ${duplicatePhones.length} duplicate phone number(s).`;
-          }
-
-          setMessage(successMessage);
+          setMessage(`Uploaded ${toInsert.length} schools${dupes.length ? `. Skipped ${dupes.length} duplicate(s).` : "."}`);
           setShowUpload(false);
           await fetchSchools();
         } catch (err: any) {
-          setMessage(`Error parsing file: ${err.message}`);
+          setMessage(`Error: ${err.message}`);
         }
       };
       reader.readAsBinaryString(file);
@@ -266,43 +214,29 @@ export default function SchoolsManagement() {
     }
   };
 
+  /* ── Add / Edit form ──────────────────────────────── */
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    setMessage("");
-
+    e.preventDefault(); setLoading(true); setMessage("");
     try {
       if (editingSchool) {
-        const { error } = await supabase
-          .from("schools")
-          .update({
-            name: formData.name,
-            address: formData.address,
-            phone: formData.phone,
-            status: formData.status || editingSchool.status,
-            updated_at: new Date().toISOString(),
-          })
-          .eq("id", editingSchool.id);
-
+        const { error } = await supabase.from("schools").update({
+          name: formData.name, address: formData.address,
+          phone: formData.phone, status: formData.status || editingSchool.status,
+          updated_at: new Date().toISOString(),
+        }).eq("id", editingSchool.id);
         if (error) throw error;
         setMessage("School updated successfully");
       } else {
         const { error } = await supabase.from("schools").insert({
-          name: formData.name,
-          address: formData.address,
-          phone: formData.phone,
-          status: formData.status || "new",
+          name: formData.name, address: formData.address,
+          phone: formData.phone, status: formData.status || "new",
         });
-
         if (error) throw error;
         setMessage("School created successfully");
       }
-
-      resetForm();
-      await fetchSchools();
+      resetForm(); await fetchSchools();
     } catch (err) {
-      setMessage("Error saving school");
-      console.error(err);
+      setMessage("Error saving school"); console.error(err);
     } finally {
       setLoading(false);
     }
@@ -310,968 +244,530 @@ export default function SchoolsManagement() {
 
   const handleDelete = async (schoolId: string) => {
     if (!confirm("Are you sure you want to delete this school?")) return;
-
     try {
-      const { error } = await supabase
-        .from("schools")
-        .delete()
-        .eq("id", schoolId);
-
+      const { error } = await supabase.from("schools").delete().eq("id", schoolId);
       if (error) throw error;
-      setMessage("School deleted successfully");
-      await fetchSchools();
+      setMessage("School deleted successfully"); await fetchSchools();
     } catch (err) {
-      setMessage("Error deleting school");
-      console.error(err);
+      setMessage("Error deleting school"); console.error(err);
     }
   };
 
-
-
-  const handleEdit = (school: School) => {
-    setEditingSchool(school);
-    setFormData({
-      name: school.name,
-      address: school.address,
-      phone: school.phone,
-      status: school.status as string,
-    });
-    setShowForm(true);
-  };
 
   const resetForm = () => {
-    setShowForm(false);
-    setEditingSchool(null);
-    setFormData({
-      name: "",
-      address: "",
-      phone: "",
-      status: user?.role === "admin" ? "new" : "active",
-    });
+    setShowForm(false); setEditingSchool(null);
+    setFormData({ name: "", address: "", phone: "", status: user?.role === "admin" ? "new" : "active" });
   };
 
+  /* ── Contact actions ──────────────────────────────── */
   const openWhatsApp = (phone: string) => {
-    const message = "Hello! I'm contacting regarding your school.";
-    const encodedMessage = encodeURIComponent(message);
-    // ensure we include country code 91 if not already present
     let digits = phone.replace(/[^0-9]/g, "");
-    if (!digits.startsWith("91")) {
-      digits = `91${digits}`;
-    }
-    window.open(
-      `https://wa.me/${digits}?text=${encodedMessage}`,
-      "_blank"
-    );
+    if (!digits.startsWith("91")) digits = `91${digits}`;
+    window.open(`https://wa.me/${digits}?text=${encodeURIComponent("Hello! I'm contacting regarding your school.")}`, "_blank");
   };
+  const callSchool = (phone: string) => { window.location.href = `tel:${phone}`; };
 
-  const callSchool = (phone: string) => {
-    window.location.href = `tel:${phone}`;
-  };
+  /* assignment modal logic removed - feature no longer used */
 
-  const openAssignmentModal = async (school: School) => {
-    if (!school || !school.id) {
-      console.error("openAssignmentModal called with invalid school", school);
-      return;
-    }
-
-    setAssignmentSchool(school);
-    setAssignmentLoading(true);
-    try {
-      const { data, error } = await supabase
-        .from("user_school_assignments")
-        .select("user_id")
-        .eq("school_id", school.id);
-
-      // log both for debugging and only treat as error if it has details
-      if (error) {
-        if (error.message || error.code) {
-          console.error(
-            "Supabase returned an error fetching assignments",
-            JSON.stringify(error, null, 2)
-          );
-          throw error;
-        } else {
-          console.warn("Supabase returned an empty error object", error);
-          // continue as if no error occurred
-        }
-      }
-
-      const userIds = data?.map((d: { user_id: string; }) => d.user_id) || [];
-      setAssignedUsers(userIds);
-      setShowAssignmentModal(true);
-    } catch (err: any) {
-      // handle missing table specially
-      if (err?.code === "PGRST205") {
-        setMessage(
-          "Assignments functionality is not available. Please create the `user_school_assignments` table in the database."
-        );
-      } else {
-        console.error("Error fetching assignments:",
-          err instanceof Error ? err.message : JSON.stringify(err));
-        setMessage("Error loading assignments");
-      }
-    } finally {
-      setAssignmentLoading(false);
-    }
-  };
-
-  const handleToggleUser = async (userId: string) => {
-    if (!assignmentSchool) return;
-
-    const isAssigned = assignedUsers.includes(userId);
-
-    try {
-      if (isAssigned) {
-        const { error } = await supabase
-          .from("user_school_assignments")
-          .delete()
-          .eq("user_id", userId)
-          .eq("school_id", assignmentSchool.id);
-
-        if (error) throw error;
-        setAssignedUsers((prev) => prev.filter((id) => id !== userId));
-        setMessage("User unassigned successfully");
-
-        // Check if school has any remaining assignments
-        const { data: remainingAssignments, error: checkError } = await supabase
-          .from("user_school_assignments")
-          .select("id")
-          .eq("school_id", assignmentSchool.id)
-          .limit(1);
-
-        if (!checkError && (!remainingAssignments || remainingAssignments.length === 0)) {
-          // No more assignments, change status back to "unassigned"
-          const { error: statusError } = await supabase
-            .from("schools")
-            .update({ status: "unassigned", updated_at: new Date().toISOString() })
-            .eq("id", assignmentSchool.id);
-          if (!statusError) {
-            setSchools((prev) =>
-              prev.map((s) => (s.id === assignmentSchool.id ? { ...s, status: "unassigned" } : s))
-            );
-          }
-        }
-      } else {
-        const { error } = await supabase
-          .from("user_school_assignments")
-          .insert({
-            user_id: userId,
-            school_id: assignmentSchool.id,
-            assigned_by: user?.id,
-          });
-
-        if (error) throw error;
-        setAssignedUsers((prev) => [...prev, userId]);
-        setMessage("User assigned successfully");
-
-        // Auto-update school status to "assigned"
-        const { error: updateError } = await supabase
-          .from("schools")
-          .update({ status: "assigned" })
-          .eq("id", assignmentSchool.id);
-        if (updateError) {
-          console.error("Error updating school status", updateError);
-        } else {
-          // update local state so UI reflects change immediately
-          setSchools((prev) =>
-            prev.map((s) => (s.id === assignmentSchool.id ? { ...s, status: "assigned" } : s))
-          );
-        }
-      }
-    } catch (err) {
-      console.error("Error updating assignment:", err);
-      setMessage("Error updating assignment");
-    }
-  };
-
-  const closeAssignmentModal = async () => {
-    setShowAssignmentModal(false);
-    setAssignmentSchool(null);
-    setAssignedUsers([]);
-    await fetchSchools();
-  };
-
+  /* ── Bulk actions ─────────────────────────────────── */
   const handleBulkToggleUser = async (userId: string) => {
-    if (selectedSchoolIds.length === 0) return;
-
-    const isAllAssigned = bulkAssignedUsers.includes(userId);
+    if (!selectedSchoolIds.length) return;
+    const isAll = bulkAssignedUsers.includes(userId);
     try {
-      if (isAllAssigned) {
-        const { error } = await supabase
-          .from("user_school_assignments")
-          .delete()
-          .eq("user_id", userId)
-          .in("school_id", selectedSchoolIds);
+      if (isAll) {
+        const { error } = await supabase.from("user_school_assignments")
+          .delete().eq("user_id", userId).in("school_id", selectedSchoolIds);
         if (error) throw error;
-        setBulkAssignedUsers((prev) => prev.filter((id) => id !== userId));
-        setMessage("User unassigned from selected schools");
+        setBulkAssignedUsers((p) => p.filter((id) => id !== userId));
       } else {
-        // prepare bulk inserts for each unassigned combination
-        const toInsert: any[] = selectedSchoolIds.map((sid) => ({
-          user_id: userId,
-          school_id: sid,
-          assigned_by: user?.id,
-        }));
-        const { error } = await supabase
-          .from("user_school_assignments")
-          .insert(toInsert);
+        const { error } = await supabase.from("user_school_assignments")
+          .insert(selectedSchoolIds.map((sid) => ({ user_id: userId, school_id: sid, assigned_by: user?.id })));
         if (error) throw error;
-        setBulkAssignedUsers((prev) => [...prev, userId]);
-        setMessage("User assigned to selected schools");
-
-        // Auto-update all selected schools to "assigned" status
-        const { error: updateError } = await supabase
-          .from("schools")
-          .update({ status: "assigned" })
-          .in("id", selectedSchoolIds);
-        if (updateError) {
-          console.error("Error updating schools status", updateError);
-        } else {
-          setSchools((prev) =>
-            prev.map((s) => (selectedSchoolIds.includes(s.id) ? { ...s, status: "assigned" } : s))
-          );
-        }
+        setBulkAssignedUsers((p) => [...p, userId]);
+        await supabase.from("schools").update({ status: "assigned" }).in("id", selectedSchoolIds);
+        setSchools((p) => p.map((s) => selectedSchoolIds.includes(s.id) ? { ...s, status: "assigned" } : s));
       }
     } catch (err) {
-      console.error("Error updating bulk assignment", err);
-      setMessage("Error updating assignments");
+      setMessage("Error updating bulk assignment"); console.error(err);
     }
   };
 
   const closeBulkModal = async () => {
-    setShowBulkModal(false);
-    setBulkAssignedUsers([]);
-    setSelectedSchoolIds([]);
+    setShowBulkModal(false); setBulkAssignedUsers([]); setSelectedSchoolIds([]);
     await fetchSchools();
   };
 
   const handleBulkDelete = async () => {
-    if (!confirm(`Are you sure you want to delete ${selectedSchoolIds.length} school(s)? This action cannot be undone.`)) {
-      return;
-    }
-
+    if (!confirm(`Delete ${selectedSchoolIds.length} school(s)? This cannot be undone.`)) return;
     setLoading(true);
     try {
-      const { error } = await supabase
-        .from("schools")
-        .delete()
-        .in("id", selectedSchoolIds);
-
+      const { error } = await supabase.from("schools").delete().in("id", selectedSchoolIds);
       if (error) throw error;
-      setMessage(`Successfully deleted ${selectedSchoolIds.length} school(s)`);
-      setSelectedSchoolIds([]);
-      await fetchSchools();
+      setMessage(`Deleted ${selectedSchoolIds.length} school(s)`);
+      setSelectedSchoolIds([]); await fetchSchools();
     } catch (err) {
-      setMessage("Error deleting selected schools");
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
+      setMessage("Error deleting schools"); console.error(err);
+    } finally { setLoading(false); }
   };
 
   const handleBulkUnassignAll = async () => {
-    if (!confirm(`Are you sure you want to unassign all users from ${selectedSchoolIds.length} selected school(s)?`)) {
-      return;
-    }
-
+    if (!confirm(`Unassign all users from ${selectedSchoolIds.length} school(s)?`)) return;
     setLoading(true);
     try {
-      const { error } = await supabase
-        .from("user_school_assignments")
-        .delete()
-        .in("school_id", selectedSchoolIds);
-
+      const { error } = await supabase.from("user_school_assignments")
+        .delete().in("school_id", selectedSchoolIds);
       if (error) throw error;
-      setMessage("All users unassigned from selected schools");
-
-      // Update school status back to "unassigned" since no assignments remain
-      const { error: statusError } = await supabase
-        .from("schools")
+      await supabase.from("schools")
         .update({ status: "unassigned", updated_at: new Date().toISOString() })
         .in("id", selectedSchoolIds);
-
-      if (!statusError) {
-        setSchools((prev) =>
-          prev.map((s) => (selectedSchoolIds.includes(s.id) ? { ...s, status: "unassigned" } : s))
-        );
-      }
-
+      setSchools((p) => p.map((s) => selectedSchoolIds.includes(s.id) ? { ...s, status: "unassigned" } : s));
+      setMessage("Unassigned all users from selected schools");
       await fetchSchools();
     } catch (err) {
-      setMessage("Error unassigning users");
-      console.error(err);
+      setMessage("Error unassigning users"); console.error(err);
+    } finally { setLoading(false); }
+  };
+
+  /* ── Status inline update ─────────────────────────── */
+  const handleStatusChange = async (school: School, val: StatusKey) => {
+    if (statusUpdating === school.id) return;
+    setStatusUpdating(school.id);
+    const prev = school.status;
+    setSchools((p) => p.map((s) => s.id === school.id ? { ...s, status: val } : s));
+    try {
+      const { error } = await supabase.from("schools")
+        .update({ status: val, updated_at: new Date().toISOString() }).eq("id", school.id);
+      if (error) {
+        setSchools((p) => p.map((s) => s.id === school.id ? { ...s, status: prev } : s));
+        setMessage("Error updating status");
+      }
+    } catch {
+      setSchools((p) => p.map((s) => s.id === school.id ? { ...s, status: prev } : s));
+      setMessage("Error updating status");
     } finally {
-      setLoading(false);
+      setStatusUpdating(null);
     }
   };
 
-  const statusStyle = (status: string) => {
-    switch (status) {
-      case "new":
-        return { backgroundColor: "#ffeb3b", color: "#000", fontWeight: 600 };
-      case "active":
-        return { backgroundColor: "#4caf50", color: "#fff", fontWeight: 600 };
-      case "interested":
-        return { backgroundColor: "#2196f3", color: "#fff", fontWeight: 600 };
-      case "assigned":
-        return { backgroundColor: "#9c27b0", color: "#fff", fontWeight: 600 };
-      case "inactive":
-        return { backgroundColor: "#9e9e9e", color: "#fff", fontWeight: 600 };
-      case "unassigned":
-        return { backgroundColor: "#607d8b", color: "#fff", fontWeight: 600 };
-      case "not_interested":
-        return { backgroundColor: "#f44336", color: "#fff", fontWeight: 600 };
-      default:
-        return {};
-    }
-  };
+  /* ── Filtered list ────────────────────────────────── */
+  const filteredSchools = schools.filter((s) => {
+    const matchesName   = s.name.toLowerCase().includes(searchText.toLowerCase());
+    const matchesStatus = statusFilter ? s.status === statusFilter : true;
+    return matchesName && matchesStatus;
+  });
 
-  const statusClass = (status: string) => {
-    switch (status) {
-      case "new":
-        return styles.statusNew;
-      case "active":
-        return styles.statusActive;
-      case "interested":
-        return styles.statusInterested;
-      case "assigned":
-        return styles.statusAssigned;
-      case "inactive":
-        return styles.statusInactive;
-      case "unassigned":
-        return styles.statusUnassigned;
-      case "not_interested":
-        return styles.statusNotInterested;
-      default:
-        return "";
-    }
-  };
+  const allChecked =
+    filteredSchools.length > 0 && selectedSchoolIds.length === filteredSchools.length;
 
-  const filteredSchools = schools
-    .filter((s) => {
-      const matchesName = s.name.toLowerCase().includes(searchText.toLowerCase());
-      const matchesStatus = statusFilter ? s.status === statusFilter : true;
-      return matchesName && matchesStatus;
-    });
-
+  /* ── Render ───────────────────────────────────────── */
   return (
-    <div className="card">
-      <div className="flex-between" style={{ marginBottom: "1.5rem" }}>
-        <h2>Schools Management</h2>
-        <div className={styles.actions}>
-          {user?.role === "admin" && (
-            <Button
-              variant="outlined"
-              startIcon={<Add />}
-              onClick={() => setShowForm(true)}
-            >
-              Add School
-            </Button>
-          )}
-          {user?.role === "admin" && (
-            <Button
-              variant="outlined"
-              onClick={() => setShowUpload(!showUpload)}
-            >
-              Upload Excel
-            </Button>
-          )}
+    <div className={styles.wrapper}>
+      <div className={styles.card}>
+
+        {/* Header */}
+        <div className={styles.header}>
+          <div className={styles.titleBlock}>
+            <div className={styles.titleIcon}>
+              <SchoolOutlined fontSize="small" />
+            </div>
+            <h2 className={styles.pageTitle}>Schools Management</h2>
+          </div>
+
+          <div className={styles.headerActions}>
+            {user?.role === "admin" && (
+              <>
+                <button className={styles.btnPrimary} onClick={() => setShowForm(true)}>
+                  <Add fontSize="small" /> Add School
+                </button>
+                <button className={styles.btnOutline} onClick={() => setShowUpload((v) => !v)}>
+                  <UploadFile fontSize="small" /> Upload Excel
+                </button>
+              </>
+            )}
+          </div>
         </div>
-      </div>
 
-      {message && (
-        <Alert
-          severity={message.includes("Error") ? "error" : "success"}
-          style={{ marginBottom: "1rem" }}
-        >
-          {message}
-        </Alert>
-      )}
+        {/* Alert */}
+        {message && (
+          <div className={`${styles.alert} ${message.toLowerCase().includes("error") ? styles.alertError : styles.alertSuccess}`}>
+            {message.toLowerCase().includes("error")
+              ? <ErrorOutline fontSize="small" />
+              : <CheckCircleOutline fontSize="small" />}
+            {message}
+          </div>
+        )}
 
-      {schoolsLoading && (
-        <div className="text-center" style={{ marginBottom: "1rem" }}>
-          <CircularProgress size={24} />
-        </div>
-      )}
+        {/* Upload panel */}
+        {showUpload && (
+          <div className={styles.uploadPanel}>
+            <h3>Upload Schools from Excel</h3>
+            <p>Columns required: <strong>School Name</strong>, <strong>Address</strong>, <strong>Phone Number</strong></p>
+            <input
+              type="file" accept=".xlsx,.xls,.csv"
+              onChange={handleFileUpload}
+              disabled={loading}
+              className={styles.fileInput}
+            />
+            <button className={styles.btnOutline} onClick={() => setShowUpload(false)}>Cancel</button>
+          </div>
+        )}
 
-      {notesSchoolId && (
-        <NotesPanel
-          schoolId={notesSchoolId}
-          schoolName={notesSchoolName}
-          onClose={() => {
-            setNotesSchoolId(null);
-            setNotesSchoolName("");
-            // await fetchSchools(); // removed to prevent excessive refreshing
-          }}
-          onNoteCountChange={(count) => {
-            setNoteCounts((prev) => ({
-              ...prev,
-              [notesSchoolId]: count,
-            }));
-          }}
-        />
-      )}
-
-      {showUpload && (
-        <Paper className={styles.uploadPanel} elevation={2}>
-          <h3>Upload Schools from Excel</h3>
-          <p className="text-muted">
-            Column names should be: School Name, Address, Phone Number
-          </p>
-          <input
-            type="file"
-            accept=".xlsx,.xls,.csv"
-            onChange={handleFileUpload}
-            disabled={loading}
-            style={{ marginBottom: "1rem" }}
+        {/* Notes panel */}
+        {notesSchoolId && (
+          <NotesPanel
+            schoolId={notesSchoolId}
+            schoolName={notesSchoolName}
+            onClose={() => { setNotesSchoolId(null); setNotesSchoolName(""); }}
+            onNoteCountChange={(count) =>
+              setNoteCounts((p) => ({ ...p, [notesSchoolId]: count }))
+            }
           />
-          <Button
-            variant="contained"
-            color="secondary"
-            onClick={() => setShowUpload(false)}
+        )}
+
+        {/* Toolbar */}
+        <div className={styles.toolbar}>
+          <div className={styles.searchBox}>
+            <Search />
+            <input
+              value={searchText}
+              onChange={(e) => setSearchText(e.target.value)}
+              placeholder="Search schools…"
+            />
+          </div>
+          <select
+            className={styles.filterSelect}
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
           >
-            Cancel
-          </Button>
-        </Paper>
-      )}
+            <option value="">All Status</option>
+            <option value="new">New</option>
+            <option value="active">Active</option>
+            <option value="interested">Interested</option>
+            <option value="inactive">Inactive</option>
+            <option value="unassigned">Unassigned</option>
+            <option value="assigned">Assigned</option>
+            <option value="not_interested">Not Interested</option>
+          </select>
+        </div>
 
-      {/* search & status filters */}
-      <div style={{ display: "flex", gap: "0.5rem", marginBottom: "1rem" }}>
-        <TextField
-          label="Search schools"
-          variant="outlined"
-          size="small"
-          value={searchText}
-          onChange={(e) => setSearchText(e.target.value)}
-          style={{ flex: 1 }}
-        />
-        <TextField
-          select
-          variant="outlined"
-          size="small"
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
-          style={{ width: "150px" }}
-          SelectProps={{ native: true }}
-        >
-          <option value="">All</option>
-          <option value="new">new</option>
-          <option value="active">active</option>
-          <option value="interested">interested</option>
-          <option value="inactive">inactive</option>
-          <option value="unassigned">unassigned</option>
-          <option value="assigned">assigned</option>
-        </TextField>
-      </div>
-
-      {/* bulk action bar */}
-      {selectedSchoolIds.length > 0 && (
-        <Paper
-          style={{ padding: "0.5rem", marginBottom: "1rem" }}
-          elevation={1}
-        >
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <span>{selectedSchoolIds.length} school(s) selected</span>
-            <div style={{ display: "flex", gap: "0.5rem" }}>
-              {user?.role === "admin" ? (
+        {/* Bulk bar */}
+        {selectedSchoolIds.length > 0 && (
+          <div className={styles.bulkBar}>
+            <span className={styles.bulkCount}>{selectedSchoolIds.length} selected</span>
+            <div className={styles.bulkActions}>
+              {user?.role === "admin" && (
                 <>
-                  <Button
-                    variant="outlined"
-                    startIcon={<GroupAdd />}
+                  <button
+                    className={styles.btnOutline}
                     onClick={async () => {
-                      // open bulk user assignment
-                      setShowBulkModal(true);
-                      setBulkLoading(true);
+                      setShowBulkModal(true); setBulkLoading(true);
                       try {
-                        const { data, error } = await supabase
+                        const { data } = await supabase
                           .from("user_school_assignments")
                           .select("user_id, school_id")
                           .in("school_id", selectedSchoolIds);
-                        if (error && error.code !== "PGRST205") throw error;
-                        // build map counts
                         const countMap: Record<string, number> = {};
-                        (data || []).forEach((row: any) => {
-                          countMap[row.user_id] = (countMap[row.user_id] || 0) + 1;
+                        (data || []).forEach((r: any) => {
+                          countMap[r.user_id] = (countMap[r.user_id] || 0) + 1;
                         });
-                        const usersAll = allUsers.filter(
-                          (u) => countMap[u.id] === selectedSchoolIds.length
+                        setBulkAssignedUsers(
+                          allUsers.filter((u) => countMap[u.id] === selectedSchoolIds.length).map((u) => u.id)
                         );
-                        setBulkAssignedUsers(usersAll.map((u) => u.id));
-                      } catch (err: any) {
-                        if (err?.code === "PGRST205") {
-                          setMessage(
-                            "Assignments functionality is not available. Please create the `user_school_assignments` table in the database."
-                          );
-                        } else {
-                          console.error("Error loading bulk assignments", err);
-                          setMessage("Error loading assignments");
-                        }
-                      } finally {
-                        setBulkLoading(false);
-                      }
+                      } catch { setMessage("Error loading assignments"); }
+                      finally { setBulkLoading(false); }
                     }}
                   >
-                    Assign users to selected
-                  </Button>
-                  <Button
-                    variant="outlined"
-                    startIcon={<GroupRemove />}
-                    onClick={handleBulkUnassignAll}
-                    disabled={loading}
-                  >
-                    Unassign all from selected
-                  </Button>
+                    <GroupAdd fontSize="small" /> Assign Users
+                  </button>
+                  <button className={styles.btnOutline} onClick={handleBulkUnassignAll} disabled={loading}>
+                    <GroupRemove fontSize="small" /> Unassign All
+                  </button>
                 </>
-              ) : null}
-              <Button
-                variant="outlined"
-                color="error"
-                startIcon={<Delete />}
-                onClick={handleBulkDelete}
-              >
-                Delete selected
-              </Button>
+              )}
+              <button className={styles.btnDanger} onClick={handleBulkDelete} disabled={loading}>
+                <Delete fontSize="small" /> Delete
+              </button>
             </div>
           </div>
-        </Paper>
+        )}
+
+        {/* Table */}
+        <div className={styles.tableContainer}>
+          <table className={styles.table}>
+            <thead>
+              <tr>
+                <th className={styles.colCheckbox}>
+                  <input
+                    type="checkbox" className={styles.checkbox}
+                    checked={allChecked}
+                    onChange={(e) =>
+                      setSelectedSchoolIds(e.target.checked ? filteredSchools.map((s) => s.id) : [])
+                    }
+                  />
+                </th>
+                <th className={styles.colNo}>No.</th>
+                <th className={styles.colName}>School Name</th>
+                <th className={styles.colAddress}>Address</th>
+                <th className={styles.colPhone}>Phone</th>
+                <th className={styles.colDate}>Date</th>
+                <th className={styles.colStatus}>Status</th>
+                <th className={styles.colActions}>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {schoolsLoading ? (
+                <tr className={styles.loadingRow}>
+                  <td colSpan={8}>
+                    <CircularProgress size={22} style={{ color: "#c8a96e" }} />
+                  </td>
+                </tr>
+              ) : filteredSchools.length === 0 ? (
+                <tr>
+                  <td colSpan={8}>
+                    <div className={styles.emptyState}>
+                      <div className={styles.emptyIcon}>🏫</div>
+                      No schools found
+                    </div>
+                  </td>
+                </tr>
+              ) : (
+                filteredSchools.map((school, idx) => (
+                  <tr
+                    key={school.id}
+                    className={selectedSchoolIds.includes(school.id) ? styles.rowSelected : ""}
+                  >
+                    {/* Checkbox */}
+                    <td className={styles.colCheckbox}>
+                      <input
+                        type="checkbox" className={styles.checkbox}
+                        checked={selectedSchoolIds.includes(school.id)}
+                        onChange={(e) =>
+                          setSelectedSchoolIds((p) =>
+                            e.target.checked ? [...p, school.id] : p.filter((id) => id !== school.id)
+                          )
+                        }
+                      />
+                    </td>
+
+                    {/* No */}
+                    <td className={styles.colNo}>{idx + 1}</td>
+
+                    {/* Name */}
+                    <td className={styles.colName}>{school.name}</td>
+
+                    {/* Address — truncated + popup */}
+                    <td className={styles.colAddress}>
+                      <div className={styles.addressCell}>
+                        <span className={styles.addressText}>
+                          {truncateAddress(school.address)}
+                        </span>
+                        <Tooltip title="View full address">
+                          <button
+                            className={styles.addressExpand}
+                            onClick={() => setAddressPopup({ name: school.name, address: school.address })}
+                          >
+                            <LocationOn style={{ fontSize: "1rem" }} />
+                          </button>
+                        </Tooltip>
+                      </div>
+                    </td>
+
+                    {/* Phone */}
+                    <td className={styles.colPhone}>{school.phone}</td>
+
+                    {/* Date */}
+                    <td className={styles.colDate}>
+                      {new Date(school.created_at).toLocaleDateString()}
+                    </td>
+
+                    {/* Status */}
+                    <td className={styles.colStatus}>
+                      {user?.role === "admin" ? (
+                        <select
+                          className={styles.statusSelect}
+                          value={school.status}
+                          disabled={statusUpdating === school.id}
+                          onChange={(e) => handleStatusChange(school, e.target.value as StatusKey)}
+                        >
+                          <option value="new">New</option>
+                          <option value="active">Active</option>
+                          <option value="interested">Interested</option>
+                          <option value="inactive">Inactive</option>
+                          <option value="assigned">Assigned</option>
+                          <option value="unassigned">Unassigned</option>
+                          <option value="not_interested">Not Interested</option>
+                        </select>
+                      ) : (
+                        <select
+                          className={styles.statusSelect}
+                          value={school.status}
+                          onChange={(e) => handleStatusChange(school, e.target.value as StatusKey)}
+                        >
+                          <option value="active">Active</option>
+                          <option value="interested">Interested</option>
+                          <option value="inactive">Inactive</option>
+                          <option value="not_interested">Not Interested</option>
+                        </select>
+                      )}
+                    </td>
+
+                    {/* Actions */}
+                    <td className={styles.colActions}>
+                      <Tooltip title="Call">
+                        <button className={`${styles.actionBtn} ${styles.call}`} onClick={() => callSchool(school.phone)}>
+                          <Call style={{ fontSize: "0.95rem" }} />
+                        </button>
+                      </Tooltip>
+
+                      <Tooltip title="WhatsApp">
+                        <button className={`${styles.actionBtn} ${styles.whatsapp}`} onClick={() => openWhatsApp(school.phone)}>
+                          <WhatsApp style={{ fontSize: "0.95rem" }} />
+                        </button>
+                      </Tooltip>
+
+                      <Tooltip title="Notes">
+                        <button
+                          className={`${styles.actionBtn} ${styles.notes}`}
+                          disabled={schoolsLoading}
+                          onClick={() => { setNotesSchoolId(school.id); setNotesSchoolName(school.name); }}
+                        >
+                          <Badge badgeContent={noteCounts[school.id] || 0} color="primary"
+                            sx={{ "& .MuiBadge-badge": { fontSize: "0.6rem", minWidth: "14px", height: "14px" } }}>
+                            <NoteAdd style={{ fontSize: "0.95rem" }} />
+                          </Badge>
+                        </button>
+                      </Tooltip>
+
+                      {/* Delete always visible */}
+                      <Tooltip title="Delete">
+                        <button className={`${styles.actionBtn} ${styles.delete}`} onClick={() => handleDelete(school.id)}>
+                          <Delete style={{ fontSize: "0.95rem" }} />
+                        </button>
+                      </Tooltip>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* ── Address Popup ─────────────────────────────── */}
+      {addressPopup && (
+        <div className={styles.addressModal} onClick={() => setAddressPopup(null)}>
+          <div className={styles.addressPopup} onClick={(e) => e.stopPropagation()}>
+            <h4>{addressPopup.name}</h4>
+            <p>{addressPopup.address}</p>
+            <button className={styles.popupClose} onClick={() => setAddressPopup(null)}>
+              <Close fontSize="small" />
+            </button>
+            <button className={styles.btnOutline} style={{ width: "100%" }}
+              onClick={() => window.open(`https://maps.google.com?q=${encodeURIComponent(addressPopup.address)}`, "_blank")}>
+              <LocationOn fontSize="small" /> Open in Maps
+            </button>
+          </div>
+        </div>
       )}
 
-      <TableContainer component={Paper} className={styles.tableWrapper}>
-        <Table>
-          <TableHead>
-            <TableRow>
-              <TableCell padding="checkbox">
-                <input
-                  type="checkbox"
-                  checked={
-                    selectedSchoolIds.length > 0 &&
-                    selectedSchoolIds.length === filteredSchools.length
-                  }
-                  onChange={(e) => {
-                    if (e.target.checked) {
-                      setSelectedSchoolIds(filteredSchools.map((s) => s.id));
-                    } else {
-                      setSelectedSchoolIds([]);
-                    }
-                  }}
-                />
-              </TableCell>
-              <TableCell>No.</TableCell>
-              <TableCell>School Name</TableCell>
-              <TableCell>Address</TableCell>
-              <TableCell>Phone</TableCell>
-              <TableCell className="date-column">Date</TableCell>
-              <TableCell>Status</TableCell>
-              <TableCell align="center">Actions</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {filteredSchools.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={8} align="center">
-                  {schoolsLoading ? "" : "No schools found"}
-                </TableCell>
-              </TableRow>
-            ) : (
-              filteredSchools.map((school, index) => (
-                <TableRow key={school.id} hover>
-                  <TableCell padding="checkbox">
-                    <input
-                      type="checkbox"
-                      checked={selectedSchoolIds.includes(school.id)}
-                      onChange={(e) => {
-                        setSelectedSchoolIds((prev) => {
-                          if (e.target.checked) {
-                            return [...prev, school.id];
-                          } else {
-                            return prev.filter((id) => id !== school.id);
-                          }
-                        });
-                      }}
-                    />
-                  </TableCell>
-                  <TableCell>{index + 1}</TableCell>
-                  <TableCell>{school.name}</TableCell>
-                  <TableCell>{school.address}</TableCell>
-                  <TableCell>{school.phone}</TableCell>
-                  <TableCell>
-                    {new Date(school.created_at).toLocaleDateString()}
-                  </TableCell>
-                  <TableCell className={styles.statusColumn}>
-                    {user?.role === "admin" ? (
-                      <TextField
-                        select
-                        value={school.status}
-                        onChange={async (e) => {
-                          const val = e.target.value as
-                            | "new"
-                            | "active"
-                            | "interested"
-                            | "inactive"
-                            | "unassigned"
-                            | "assigned"
-                            | "not_interested";
-
-                          if (statusUpdating === school.id) return; // prevent multiple updates
-
-                          setStatusUpdating(school.id);
-                          const prevStatus = school.status;
-
-                          // optimistic UI update
-                          setSchools((prev) =>
-                            prev.map((s) =>
-                              s.id === school.id ? { ...s, status: val } : s
-                            )
-                          );
-
-                          try {
-                            const { error } = await supabase
-                              .from("schools")
-                              .update({ status: val, updated_at: new Date().toISOString() })
-                              .eq("id", school.id);
-
-                            if (error) {
-                              // revert optimistic change
-                              setSchools((prev) =>
-                                prev.map((s) =>
-                                  s.id === school.id ? { ...s, status: prevStatus } : s
-                                )
-                              );
-                              const errMsg =
-                                (error && (error.message || error.code)) ||
-                                (Object.keys(error || {}).length === 0 ? "(no details)" : JSON.stringify(error));
-                              console.error("Error updating status", errMsg);
-                              setMessage(
-                                `Error updating status: ${errMsg}. If this mentions a constraint or invalid value, update your DB schema (see DATABASE_SCHEMA.md) and ensure 'status' allows the chosen value.`
-                              );
-                              return;
-                            }
-
-                            // success: optimistic update is already done, DB updated
-                          } catch (err) {
-                            setSchools((prev) =>
-                              prev.map((s) =>
-                                s.id === school.id ? { ...s, status: prevStatus } : s
-                              )
-                            );
-                            console.error("Error updating status", err);
-                            setMessage("Error updating status");
-                          } finally {
-                            setStatusUpdating(null);
-                          }
-                        }}
-                        size="small"
-                        variant="outlined"
-                        SelectProps={{ native: true }}
-                        InputProps={{ style: statusStyle(school.status) }}
-                        disabled={statusUpdating === school.id}
-
-                      >
-                        <option className={styles.statusSelect}
-                          value="new">new</option>
-                        <option className={styles.statusSelect} value="active">active</option>
-                        <option className={styles.statusSelect} value="interested">interested</option>
-                        <option className={styles.statusSelect} value="inactive">inactive</option>
-                        <option className={styles.statusSelect} value="assigned">assigned</option>
-                        <option className={styles.statusSelect} value="unassigned">unassigned</option>
-                        <option className={styles.statusSelect} value="not_interested">not interested</option>
-                      </TextField>
-                    ) : (
-                      // allow normal users to change select as well
-                      <TextField
-                        select
-                        value={school.status}
-                        onChange={async (e) => {
-                          const val = e.target.value as
-                            | "active"
-                            | "interested"
-                            | "inactive"
-                            | "not_interested";
-                          const prevStatus = school.status;
-                          // optimistic update
-                          setSchools((prev) =>
-                            prev.map((s) =>
-                              s.id === school.id ? { ...s, status: val } : s
-                            )
-                          );
-                          try {
-                            const { error } = await supabase
-                              .from("schools")
-                              .update({ status: val })
-                              .eq("id", school.id);
-                            if (error) {
-                              setSchools((prev) =>
-                                prev.map((s) =>
-                                  s.id === school.id ? { ...s, status: prevStatus } : s
-                                )
-                              );
-                            }
-                          } catch {
-                            setSchools((prev) =>
-                              prev.map((s) =>
-                                s.id === school.id ? { ...s, status: prevStatus } : s
-                              )
-                            );
-                          }
-                        }}
-                        size="small"
-                        variant="outlined"
-                        SelectProps={{ native: true }}
-                        InputProps={{ style: statusStyle(school.status) }}
-                      >
-                        <option className={styles.statusSelect} value="active">active</option>
-                        <option className={styles.statusSelect} value="interested">interested</option>
-                        <option className={styles.statusSelect} value="inactive">inactive</option>
-                        <option className={styles.statusSelect} value="not_interested">not interested</option>
-                      </TextField>
-                    )}
-                  </TableCell>
-                  <TableCell align="center" className={styles.actionsColumn}>
-                    <Tooltip title="Call">
-                      <IconButton
-                        size="small"
-                        onClick={() => callSchool(school.phone)}
-                      >
-                        <Call fontSize="small" />
-                      </IconButton>
-                    </Tooltip>
-                    <Tooltip title="WhatsApp">
-                      <IconButton
-                        size="small"
-                        onClick={() => openWhatsApp(school.phone)}
-                      >
-                        <WhatsApp fontSize="small" />
-                      </IconButton>
-                    </Tooltip>
-                    <Tooltip title="Notes">
-                      <IconButton
-                        size="small"
-                        onClick={() => {
-                          if (!schoolsLoading) {
-                            setNotesSchoolId(school.id);
-                            setNotesSchoolName(school.name);
-                          }
-                        }}
-                        disabled={schoolsLoading}
-                      >
-                        <Badge
-                          badgeContent={noteCounts[school.id] || 0}
-                          color="primary"
-                        >
-                          <NoteAdd fontSize="small" />
-                        </Badge>
-                      </IconButton>
-                    </Tooltip>
-                    {user?.role === "admin" && (
-                      <>
-                        <Tooltip title="Assign users">
-                          <IconButton
-                            size="small"
-                            onClick={() => openAssignmentModal(school)}
-                          >
-                            <GroupAdd fontSize="small" color="primary" />
-                          </IconButton>
-                        </Tooltip>
-                        {school.status !== "assigned" && (
-                          <>
-                            <Tooltip title="Delete">
-                              <IconButton
-                                size="small"
-                                onClick={() => handleDelete(school.id)}
-                                color="error"
-                              >
-                                <Delete fontSize="small" />
-                              </IconButton>
-                            </Tooltip>
-                          </>
-                        )}
-                      </>
-                    )}
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </TableContainer>
-
-      {/* Form dialog */}
-
-      {/* Form dialog */}
-      <Dialog open={showForm} onClose={resetForm} fullWidth maxWidth="sm">
+      {/* ── Add / Edit Dialog ─────────────────────────── */}
+      <Dialog open={showForm} onClose={resetForm} fullWidth maxWidth="sm"
+        PaperProps={{ sx: { background: "#111827", color: "#f0ece4", border: "1px solid rgba(255,255,255,0.07)", borderRadius: "12px" } }}>
+        <DialogTitle sx={{ fontFamily: "'Playfair Display', serif", background: "#1a2236", borderBottom: "1px solid rgba(255,255,255,0.07)", color: "#f0ece4" }}>
+          {editingSchool ? "Edit School" : "Add New School"}
+        </DialogTitle>
         <form onSubmit={handleSubmit}>
-          <DialogTitle>{editingSchool ? "Edit School" : "Add New School"}</DialogTitle>
-          <DialogContent>
+          <DialogContent sx={{ background: "#111827", pt: 2 }}>
+            {["name", "address", "phone"].map((field) => (
+              <TextField
+                key={field}
+                label={field.charAt(0).toUpperCase() + field.slice(1) + (field === "address" ? "" : "")}
+                value={(formData as any)[field]}
+                onChange={(e) => setFormData({ ...formData, [field]: e.target.value })}
+                required fullWidth margin="dense"
+                multiline={field === "address"} rows={field === "address" ? 3 : 1}
+                sx={{
+                  "& .MuiOutlinedInput-root": {
+                    color: "#f0ece4", background: "rgba(255,255,255,0.04)",
+                    "& fieldset": { borderColor: "rgba(255,255,255,0.09)" },
+                    "&:hover fieldset": { borderColor: "rgba(200,169,110,0.35)" },
+                    "&.Mui-focused fieldset": { borderColor: "#c8a96e" },
+                  },
+                  "& .MuiInputLabel-root": { color: "#6b7280" },
+                  "& .MuiInputLabel-root.Mui-focused": { color: "#c8a96e" },
+                }}
+              />
+            ))}
             <TextField
-              label="School Name"
-              value={formData.name}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              required
-              fullWidth
-              margin="dense"
-            />
-            <TextField
-              label="Address"
-              value={formData.address}
-              onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-              required
-              fullWidth
-              margin="dense"
-              multiline
-              rows={3}
-            />
-            <TextField
-              label="Phone Number"
-              value={formData.phone}
-              onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-              required
-              fullWidth
-              margin="dense"
-            />
-            <TextField
-              select
-              label="Status"
-              value={formData.status}
+              select label="Status" value={formData.status}
               onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-              fullWidth
-              margin="dense"
-              SelectProps={{ native: true }}
-              className={styles.statusSelect}
+              fullWidth margin="dense" SelectProps={{ native: true }}
+              sx={{
+                "& .MuiOutlinedInput-root": {
+                  color: "#f0ece4", background: "rgba(255,255,255,0.04)",
+                  "& fieldset": { borderColor: "rgba(255,255,255,0.09)" },
+                  "&:hover fieldset": { borderColor: "rgba(200,169,110,0.35)" },
+                  "&.Mui-focused fieldset": { borderColor: "#c8a96e" },
+                },
+                "& .MuiInputLabel-root": { color: "#6b7280" },
+                "& .MuiInputLabel-root.Mui-focused": { color: "#c8a96e" },
+                "& option": { background: "#1a2236" },
+              }}
             >
               {user?.role === "admin" ? (
                 <>
-                  <option className={styles.statusSelect} value="new">new</option>
-                  <option value="active">active</option>
-                  <option value="interested">interested</option>
-                  <option value="inactive">inactive</option>
-                  <option value="unassigned">unassigned</option>
-                  <option value="assigned">assigned</option>
+                  <option value="new">New</option>
+                  <option value="active">Active</option>
+                  <option value="interested">Interested</option>
+                  <option value="inactive">Inactive</option>
+                  <option value="unassigned">Unassigned</option>
+                  <option value="assigned">Assigned</option>
                 </>
               ) : (
                 <>
-                  <option value="active">active</option>
-                  <option value="interested">interested</option>
-                  <option value="inactive">inactive</option>
+                  <option value="active">Active</option>
+                  <option value="interested">Interested</option>
+                  <option value="inactive">Inactive</option>
                 </>
               )}
             </TextField>
           </DialogContent>
-          <DialogActions>
-            <Button onClick={resetForm}>Cancel</Button>
-            <Button type="submit" variant="contained" disabled={loading}>
-              {loading ? "Saving..." : "Save"}
-            </Button>
+          <DialogActions sx={{ background: "#1a2236", borderTop: "1px solid rgba(255,255,255,0.07)", px: 2, py: 1.2 }}>
+            <button type="button" className={styles.btnOutline} onClick={resetForm}>Cancel</button>
+            <button type="submit" className={styles.btnPrimary} disabled={loading}>
+              {loading ? "Saving…" : "Save School"}
+            </button>
           </DialogActions>
         </form>
       </Dialog>
 
-      {/* Assignment dialog */}
-      <Dialog
-        open={showAssignmentModal}
-        onClose={closeAssignmentModal}
-        fullWidth
-        maxWidth="sm"
-      >
-        <DialogTitle>
-          Assign Users to "{assignmentSchool?.name}" 
-          {assignmentSchool && (
-            <Chip 
-              label={assignmentSchool.status} 
-              size="small" 
-              className={statusClass(assignmentSchool.status)}
-              style={{ marginLeft: '0.5rem', fontSize: '0.75rem' }}
-            />
-          )}
-          {assignmentLoading && (
-            <CircularProgress size={20} style={{ marginLeft: "0.5rem" }} />
-          )}
-        </DialogTitle>
-        <DialogContent dividers>
-          {assignmentSchool?.status === "unassigned" && (
-            <Alert severity="info" style={{ marginBottom: "1rem" }}>
-              This school is currently unassigned. Assign users below to change its status.
-            </Alert>
-          )}
-          {allUsers.length === 0 ? (
-            <p className="text-muted">No users available for assignment</p>
-          ) : (
-            allUsers.map((u) => (
-              <div
-                key={u.id}
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  padding: "0.5rem 0",
-                }}
-              >
-                <div>
-                  <p style={{ margin: 0, fontWeight: 500 }}>{u.name}</p>
-                  <p style={{ margin: "0.25rem 0 0 0", color: "#666" }}>
-                    {u.email}
-                  </p>
-                </div>
-                <input
-                  type="checkbox"
-                  checked={assignedUsers.includes(u.id)}
-                  onChange={() => handleToggleUser(u.id)}
-                />
-              </div>
-            ))
-          )}
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={closeAssignmentModal}>Close</Button>
-        </DialogActions>
-      </Dialog>
+      {/* assignment dialog removed – feature deprecated */}
 
-      {/* Bulk assignment dialog */}
-      <Dialog
-        open={showBulkModal}
-        onClose={closeBulkModal}
-        fullWidth
-        maxWidth="sm"
-      >
-        <DialogTitle>
-          Assign Users to {selectedSchoolIds.length} selected school(s){" "}
-          {bulkLoading && (
-            <CircularProgress size={20} style={{ marginLeft: "0.5rem" }} />
-          )}
+      {/* ── Bulk Assignment Dialog ────────────────────── */}
+      <Dialog open={showBulkModal} onClose={closeBulkModal} fullWidth maxWidth="sm"
+        PaperProps={{ sx: { background: "#111827", color: "#f0ece4", border: "1px solid rgba(255,255,255,0.07)", borderRadius: "12px" } }}>
+        <DialogTitle sx={{ fontFamily: "'Playfair Display', serif", background: "#1a2236", borderBottom: "1px solid rgba(255,255,255,0.07)", color: "#f0ece4", display: "flex", alignItems: "center", gap: 1 }}>
+          Bulk Assign — {selectedSchoolIds.length} school(s)
+          {bulkLoading && <CircularProgress size={16} sx={{ color: "#c8a96e", ml: 1 }} />}
         </DialogTitle>
-        <DialogContent dividers>
-          <Alert severity="info" style={{ marginBottom: "1rem" }}>
-            Assign users to the selected schools. Schools will automatically be marked as "assigned" when users are assigned.
-          </Alert>
-          {allUsers.length === 0 ? (
-            <p className="text-muted">No users available for assignment</p>
-          ) : (
-            allUsers.map((u) => (
-              <div
-                key={u.id}
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  padding: "0.5rem 0",
-                }}
-              >
-                <div>
-                  <p style={{ margin: 0, fontWeight: 500 }}>{u.name}</p>
-                  <p style={{ margin: "0.25rem 0 0 0", color: "#666" }}>
-                    {u.email}
-                  </p>
-                </div>
-                <input
-                  type="checkbox"
-                  checked={bulkAssignedUsers.includes(u.id)}
-                  onChange={() => handleBulkToggleUser(u.id)}
-                />
+        <DialogContent sx={{ background: "#111827", p: "1.25rem 1.5rem" }}>
+          <p style={{ fontSize: "0.82rem", color: "#9ca3af", marginBottom: "1rem" }}>
+            Schools are auto-marked <strong style={{ color: "#c084fc" }}>assigned</strong> when a user is added.
+          </p>
+          {allUsers.map((u) => (
+            <div key={u.id} className={styles.userRow}>
+              <div>
+                <p className={styles.userName}>{u.name}</p>
+                <p className={styles.userEmail}>{u.email}</p>
               </div>
-            ))
-          )}
+              <input type="checkbox" className={styles.checkbox}
+                checked={bulkAssignedUsers.includes(u.id)}
+                onChange={() => handleBulkToggleUser(u.id)} />
+            </div>
+          ))}
         </DialogContent>
-        <DialogActions>
-          <Button onClick={closeBulkModal}>Close</Button>
+        <DialogActions sx={{ background: "#1a2236", borderTop: "1px solid rgba(255,255,255,0.07)", px: 2, py: 1.2 }}>
+          <button className={styles.btnPrimary} onClick={closeBulkModal}>Done</button>
         </DialogActions>
       </Dialog>
     </div>
