@@ -92,6 +92,11 @@ export default function SchoolsManagement() {
   // Address popup
   const [addressPopup, setAddressPopup] = useState<{ name: string; address: string } | null>(null);
 
+  // Delete confirmation modal
+  const [deleteModal, setDeleteModal] = useState<{ open: boolean; type: 'single' | 'bulk'; schoolId?: string; schoolName?: string }>(
+    { open: false, type: 'single' }
+  );
+
   const { user } = useAuth();
   const supabase = createClient();
 
@@ -242,15 +247,8 @@ export default function SchoolsManagement() {
     }
   };
 
-  const handleDelete = async (schoolId: string) => {
-    if (!confirm("Are you sure you want to delete this school?")) return;
-    try {
-      const { error } = await supabase.from("schools").delete().eq("id", schoolId);
-      if (error) throw error;
-      setMessage("School deleted successfully"); await fetchSchools();
-    } catch (err) {
-      setMessage("Error deleting school"); console.error(err);
-    }
+  const handleDelete = async (schoolId: string, schoolName: string) => {
+    setDeleteModal({ open: true, type: 'single', schoolId, schoolName });
   };
 
 
@@ -298,16 +296,30 @@ export default function SchoolsManagement() {
   };
 
   const handleBulkDelete = async () => {
-    if (!confirm(`Delete ${selectedSchoolIds.length} school(s)? This cannot be undone.`)) return;
+    setDeleteModal({ open: true, type: 'bulk' });
+  };
+
+  /* ── Confirmed delete ──────────────────────────────── */
+  const confirmDelete = async () => {
     setLoading(true);
     try {
-      const { error } = await supabase.from("schools").delete().in("id", selectedSchoolIds);
-      if (error) throw error;
-      setMessage(`Deleted ${selectedSchoolIds.length} school(s)`);
-      setSelectedSchoolIds([]); await fetchSchools();
+      if (deleteModal.type === 'single' && deleteModal.schoolId) {
+        const { error } = await supabase.from("schools").delete().eq("id", deleteModal.schoolId);
+        if (error) throw error;
+        setMessage("School deleted successfully");
+      } else if (deleteModal.type === 'bulk') {
+        const { error } = await supabase.from("schools").delete().in("id", selectedSchoolIds);
+        if (error) throw error;
+        setMessage(`Deleted ${selectedSchoolIds.length} school(s)`);
+        setSelectedSchoolIds([]);
+      }
+      setDeleteModal({ open: false, type: 'single' });
+      await fetchSchools();
     } catch (err) {
-      setMessage("Error deleting schools"); console.error(err);
-    } finally { setLoading(false); }
+      setMessage("Error deleting school(s)"); console.error(err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleBulkUnassignAll = async () => {
@@ -640,7 +652,7 @@ export default function SchoolsManagement() {
 
                       {/* Delete always visible */}
                       <Tooltip title="Delete">
-                        <button className={`${styles.actionBtn} ${styles.delete}`} onClick={() => handleDelete(school.id)}>
+                        <button className={`${styles.actionBtn} ${styles.delete}`} onClick={() => handleDelete(school.id, school.name)}>
                           <Delete style={{ fontSize: "0.95rem" }} />
                         </button>
                       </Tooltip>
@@ -768,6 +780,36 @@ export default function SchoolsManagement() {
         </DialogContent>
         <DialogActions sx={{ background: "#1a2236", borderTop: "1px solid rgba(255,255,255,0.07)", px: 2, py: 1.2 }}>
           <button className={styles.btnPrimary} onClick={closeBulkModal}>Done</button>
+        </DialogActions>
+      </Dialog>
+
+      {/* ── Delete Confirmation Dialog ────────────────── */}
+      <Dialog open={deleteModal.open} onClose={() => setDeleteModal({ open: false, type: 'single' })} fullWidth maxWidth="sm"
+        PaperProps={{ sx: { background: "#111827", color: "#f0ece4", border: "1px solid rgba(255,255,255,0.07)", borderRadius: "12px" } }}>
+        <DialogTitle sx={{ fontFamily: "'Playfair Display', serif", background: "#1a2236", borderBottom: "1px solid rgba(255,255,255,0.07)", color: "#f0ece4" }}>
+          Delete {deleteModal.type === 'bulk' ? 'Schools' : 'School'}?
+        </DialogTitle>
+        <DialogContent sx={{ background: "#111827", pt: 2, pb: 1 }}>
+          <p style={{ color: "#f0ece4", marginBottom: "0.5rem" }}>
+            {deleteModal.type === 'single'
+              ? `Are you sure you want to delete "${deleteModal.schoolName}"?`
+              : `Are you sure you want to delete ${selectedSchoolIds.length} school(s)?`}
+          </p>
+          <p style={{ fontSize: "0.82rem", color: "#ef4444" }}>
+            This action cannot be undone.
+          </p>
+        </DialogContent>
+        <DialogActions sx={{ background: "#1a2236", borderTop: "1px solid rgba(255,255,255,0.07)", px: 2, py: 1.2 }}>
+          <button className={styles.btnOutline} onClick={() => setDeleteModal({ open: false, type: 'single' })}>
+            Cancel
+          </button>
+          <button 
+            className={styles.btnDanger} 
+            onClick={confirmDelete} 
+            disabled={loading}
+          >
+            {loading ? "Deleting…" : "Delete"}
+          </button>
         </DialogActions>
       </Dialog>
     </div>
