@@ -87,7 +87,6 @@
 }
 .brandIcon:hover { box-shadow: 0 0 24px var(--accent-glow); }
 
-.brandText {}
 .brandTitle {
   font-family: 'Playfair Display', serif;
   font-size: 1.1rem;
@@ -103,6 +102,15 @@
   letter-spacing: 0.06em;
   text-transform: uppercase;
   margin: 0;
+}
+
+.mobileUserName {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+  line-height: 1.2;
+  display: none;
 }
 
 /* ── Nav Right ───────────────────────────────────────── */
@@ -136,7 +144,6 @@
   flex-shrink: 0;
 }
 
-.userInfo {}
 .userName {
   font-size: 0.82rem;
   font-weight: 600;
@@ -393,5 +400,6 @@
 @media (max-width: 520px) {
   .userChip { display: none; }
   .brandSub { display: none; }
+  .mobileUserName { display: block; }
   .tab { padding: 0.85rem 0.9rem; font-size: 0.78rem; gap: 0.3rem; }
 }

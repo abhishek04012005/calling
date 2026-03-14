@@ -516,6 +516,7 @@
   justify-content: space-between;
   padding: 0.65rem 0;
   border-bottom: 1px solid var(--border);
+  gap: 0.75rem;
 }
 .userRow:last-child { border-bottom: none; }
 .userName { margin: 0; font-weight: 500; color: var(--text-primary); font-size: 0.9rem; }
@@ -550,4 +551,8 @@
 @media (max-width: 480px) {
   .colPhone { display: none; }
   .pageTitle { font-size: 1.1rem; }
+  
+  .userRow { flex-wrap: wrap; align-items: flex-start; gap: 0.5rem; }
+  .userName { font-size: 0.85rem; flex: 1; }
+  .userEmail { flex: 1; }
 }

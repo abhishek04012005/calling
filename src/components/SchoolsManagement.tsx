@@ -774,7 +774,7 @@ export default function SchoolsManagement() {
           </p>
           {allUsers.map((u) => (
             <div key={u.id} className={styles.userRow}>
-              <div>
+              <div style={{ flex: 1, minWidth: 0 }}>
                 <p className={styles.userName}>{u.name}</p>
                 <p className={styles.userEmail}>{u.email}</p>
               </div>

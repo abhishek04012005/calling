@@ -103,6 +103,7 @@ export default function Dashboard() {
               {user.role === "admin" ? "Admin Dashboard" : "Dashboard"}
             </p>
             <p className={styles.brandSub}>School Management Portal</p>
+            <p className={styles.mobileUserName}>{user.name}</p>
           </div>
         </div>
 
