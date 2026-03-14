@@ -665,22 +665,28 @@ export default function SchoolsManagement() {
         </div>
       </div>
 
-      {/* ── Address Popup ─────────────────────────────── */}
-      {addressPopup && (
-        <div className={styles.addressModal} onClick={() => setAddressPopup(null)}>
-          <div className={styles.addressPopup} onClick={(e) => e.stopPropagation()}>
-            <h4>{addressPopup.name}</h4>
-            <p>{addressPopup.address}</p>
-            <button className={styles.popupClose} onClick={() => setAddressPopup(null)}>
-              <Close fontSize="small" />
-            </button>
-            <button className={styles.btnOutline} style={{ width: "100%" }}
-              onClick={() => window.open(`https://maps.google.com?q=${encodeURIComponent(addressPopup.address)}`, "_blank")}>
-              <LocationOn fontSize="small" /> Open in Maps
-            </button>
-          </div>
-        </div>
-      )}
+      {/* ── Address Popup (Dialog) ────────────────────────── */}
+      <Dialog open={!!addressPopup} onClose={() => setAddressPopup(null)} fullWidth maxWidth="sm"
+        PaperProps={{ sx: { background: "#111827", color: "#f0ece4", border: "1px solid rgba(255,255,255,0.07)", borderRadius: "12px" } }}>
+        <DialogTitle sx={{ fontFamily: "'Playfair Display', serif", background: "#1a2236", borderBottom: "1px solid rgba(255,255,255,0.07)", color: "#f0ece4", display: "flex", alignItems: "center", gap: 1 }}>
+          <LocationOn fontSize="small" sx={{ color: "#c8a96e" }} />
+          {addressPopup?.name}
+        </DialogTitle>
+        <DialogContent sx={{ background: "#111827", pt: 2, pb: 1 }}>
+          <p style={{ color: "#f0ece4", fontSize: "0.95rem", lineHeight: "1.6", margin: "0 0 1rem" }}>
+            {addressPopup?.address}
+          </p>
+        </DialogContent>
+        <DialogActions sx={{ background: "#1a2236", borderTop: "1px solid rgba(255,255,255,0.07)", px: 2, py: 1.2 }}>
+          <button className={styles.btnOutline} onClick={() => setAddressPopup(null)}>
+            Close
+          </button>
+          <button className={styles.btnPrimary} 
+            onClick={() => window.open(`https://maps.google.com?q=${encodeURIComponent(addressPopup?.address || "")}`, "_blank")}>
+            <LocationOn style={{ fontSize: "0.9rem" }} /> Open Maps
+          </button>
+        </DialogActions>
+      </Dialog>
 
       {/* ── Add / Edit Dialog ─────────────────────────── */}
       <Dialog open={showForm} onClose={resetForm} fullWidth maxWidth="sm"

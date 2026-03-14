@@ -521,59 +521,8 @@
 .userName { margin: 0; font-weight: 500; color: var(--text-primary); font-size: 0.9rem; }
 .userEmail { margin: 0.1rem 0 0; color: var(--text-secondary); font-size: 0.78rem; }
 
-/* ── Address Popup (modal) ───────────────────────────── */
-.addressModal {
-  position: fixed;
-  inset: 0;
-  z-index: 10000000002;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(0,0,0,0.6);
-  backdrop-filter: blur(4px);
-  animation: overlayFade 0.2s ease both;
-}
-
-.addressPopup {
-  background: var(--surface-2);
-  border: 1px solid var(--border-hover);
-  border-radius: var(--radius-md);
-  padding: 1.5rem 1.75rem;
-  max-width: 360px;
-  width: 90%;
-  box-shadow: var(--shadow-lg);
-  animation: popupReveal 0.25s cubic-bezier(0.16,1,0.3,1) both;
-  position: relative;
-}
-
-.addressPopup h4 {
-  font-family: 'Playfair Display', serif;
-  font-size: 0.95rem;
-  color: var(--accent);
-  margin: 0 0 0.65rem;
-  letter-spacing: 0.02em;
-}
-
-.addressPopup p {
-  font-size: 0.9rem;
-  color: var(--text-primary);
-  line-height: 1.6;
-  margin: 0 0 1.1rem;
-}
-
-.popupClose {
-  position: absolute;
-  top: 0.75rem; right: 0.75rem;
-  background: none;
-  border: none;
-  color: var(--text-muted);
-  cursor: pointer;
-  font-size: 1.1rem;
-  display: flex;
-  align-items: center;
-  transition: color var(--transition);
-}
-.popupClose:hover { color: var(--text-primary); }
+/* ── Address Popup (using MUI Dialog - CSS no longer needed) ─── */
+/* Styles moved to inline sx prop in Dialog component */
 
 /* ── Keyframes ───────────────────────────────────────── */
 @keyframes fadeSlideDown {
@@ -583,10 +532,6 @@
 @keyframes overlayFade {
   from { opacity: 0; }
   to   { opacity: 1; }
-}
-@keyframes popupReveal {
-  from { opacity: 0; transform: scale(0.92) translateY(12px); }
-  to   { opacity: 1; transform: scale(1)    translateY(0); }
 }
 
 /* ── Responsive ──────────────────────────────────────── */
