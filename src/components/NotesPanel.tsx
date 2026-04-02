@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { createClient } from "@/lib/supabase";
 import { Note } from "@/lib/types";
 import {
@@ -49,7 +49,7 @@ export default function NotesPanel({
   const [message, setMessage]         = useState("");
 
   const { user }  = useAuth();
-  const supabase  = createClient();
+  const supabase  = useMemo(() => createClient(), []);
 
   /* auto-dismiss message */
   useEffect(() => {
@@ -67,17 +67,13 @@ export default function NotesPanel({
     };
   }, []);
 
-  useEffect(() => {
-    fetchNotes();
-  }, [entityId]);
-
   /* ── Fetch ───────────────────────────────────────── */
-  const fetchNotes = async () => {
+  const fetchNotes = useCallback(async () => {
     try {
       const { data, error } = await supabase
         .from("notes")
         .select("*")
-        .eq("entity_id", entityId)
+        .eq("school_id", entityId)
         .order("created_at", { ascending: false });
 
       if (error) throw error;
@@ -87,7 +83,11 @@ export default function NotesPanel({
     } catch (err) {
       console.error("Error fetching notes:", err);
     }
-  };
+  }, [entityId, onNoteCountChange, supabase]);
+
+  useEffect(() => {
+    fetchNotes();
+  }, [entityId, fetchNotes]);
 
   /* ── Submit ──────────────────────────────────────── */
   const handleSubmit = async (e: React.FormEvent) => {
@@ -107,7 +107,7 @@ export default function NotesPanel({
         setMessage("Note updated successfully");
       } else {
         const { error } = await supabase.from("notes").insert({
-          entity_id:   entityId,
+          school_id:   entityId,
           author_id:   user.id,
           author_name: user.name,
           content:     formData.content,
