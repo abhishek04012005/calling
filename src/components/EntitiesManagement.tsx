@@ -375,7 +375,8 @@ export default function EntitiesManagement() {
   const openWhatsApp = (phone: string) => {
     let digits = phone.replace(/[^0-9]/g, "");
     if (!digits.startsWith("91")) digits = `91${digits}`;
-    window.open(`https://wa.me/${digits}?text=${encodeURIComponent(`Hello! I'm contacting regarding your ${entityConfig.label.toLowerCase()}.`)}`, "_blank");
+    const message = entityConfig.whatsappMessage || "Hello! I'm contacting you.";
+    window.open(`https://wa.me/${digits}?text=${encodeURIComponent(message)}`, "_blank");
   };
   const callEntity = (phone: string) => { window.location.href = `tel:${phone}`; };
 
