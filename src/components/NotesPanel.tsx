@@ -17,8 +17,8 @@ import styles from "./NotesPanel.module.css";
 
 /* ── Props ───────────────────────────────────────────── */
 interface NotesPanelProps {
-  schoolId: string;
-  schoolName?: string;
+  entityId: string;
+  entityName?: string;
   onClose?: () => void;
   onNoteCountChange?: (count: number) => void;
 }
@@ -36,8 +36,8 @@ function getInitials(name: string): string {
 
 /* ── Component ───────────────────────────────────────── */
 export default function NotesPanel({
-  schoolId,
-  schoolName = "School",
+  entityId,
+  entityName = "Entity",
   onClose,
   onNoteCountChange,
 }: NotesPanelProps) {
@@ -69,7 +69,7 @@ export default function NotesPanel({
 
   useEffect(() => {
     fetchNotes();
-  }, [schoolId]);
+  }, [entityId]);
 
   /* ── Fetch ───────────────────────────────────────── */
   const fetchNotes = async () => {
@@ -77,7 +77,7 @@ export default function NotesPanel({
       const { data, error } = await supabase
         .from("notes")
         .select("*")
-        .eq("school_id", schoolId)
+        .eq("entity_id", entityId)
         .order("created_at", { ascending: false });
 
       if (error) throw error;
@@ -107,7 +107,7 @@ export default function NotesPanel({
         setMessage("Note updated successfully");
       } else {
         const { error } = await supabase.from("notes").insert({
-          school_id:   schoolId,
+          entity_id:   entityId,
           author_id:   user.id,
           author_name: user.name,
           content:     formData.content,
@@ -165,7 +165,7 @@ export default function NotesPanel({
               <NoteAltOutlined style={{ fontSize: "1rem" }} />
             </div>
             <div className={styles.titleBlock}>
-              <h3 className={styles.title}>{schoolName}</h3>
+              <h3 className={styles.title}>{entityName}</h3>
               <p className={styles.subtitle}>Notes &amp; Observations</p>
             </div>
           </div>

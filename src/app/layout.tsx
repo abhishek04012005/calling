@@ -3,8 +3,8 @@ import "@/styles/globals.css";
 import { AuthProvider } from "@/context/AuthContext";
 
 export const metadata: Metadata = {
-  title: "Admin Dashboard",
-  description: "School Management Admin Dashboard",
+  title: "Data Management Portal",
+  description: "Entity Management Data Portal",
 };
 
 export default function RootLayout({

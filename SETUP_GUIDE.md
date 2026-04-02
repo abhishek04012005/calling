@@ -1,4 +1,4 @@
-# Setup Guide for School Management Dashboard
+# Setup Guide for Data Management Portal
 
 Complete step-by-step instructions to get the application running.
 
@@ -180,21 +180,21 @@ Use the demo credentials:
 - Change task status from dropdown
 - Edit or delete tasks
 
-### Schools Tab
-- View all schools in a responsive table
-- Add schools manually via form
+### Entities Tab
+- View all entities in a responsive table
+- Add entities manually via form
 - **Upload Excel file** with columns:
-  - School Name
+  - Entity Name
   - Address
   - Phone Number
-- Edit school information
-- Delete schools
+- Edit entity information
+- Delete entities
 - Click phone icon to call
 - Click WhatsApp icon to send message
-- Toggle school status (active/inactive)
+- Toggle entity status (active/inactive)
 
-### Notes Panel (within Schools)
-- Add notes to schools
+### Notes Panel (within Entities)
+- Add notes to entities
 - View author name and timestamp
 - Edit your own notes
 - Delete your own notes
@@ -233,8 +233,8 @@ src/
 │   ├── LoginForm.tsx             # Handles login validation
 │   ├── UserManagement.tsx        # User CRUD operations
 │   ├── TaskManagement.tsx        # Task CRUD and status management
-│   ├── SchoolsManagement.tsx    # Schools CRUD, Excel import, action buttons
-│   └── NotesPanel.tsx            # Note CRUD for schools
+│   ├── EntitiesManagement.tsx    # Entity CRUD, Excel import, action buttons
+│   └── NotesPanel.tsx            # Note CRUD for entities
 │
 ├── context/                      # React Context for state management
 │   └── AuthContext.tsx           # Authentication and session management

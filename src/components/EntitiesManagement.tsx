@@ -1,11 +1,12 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
-import styles from "./SchoolsManagement.module.css";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
+import styles from "./EntitiesManagement.module.css";
 import { createClient } from "@/lib/supabase";
-import { School, User } from "@/lib/types";
+import { Entity, User } from "@/lib/types";
 import { useAuth } from "@/context/AuthContext";
 import * as XLSX from "xlsx";
+import { ENTITY_TYPES, CURRENT_ENTITY_TYPE } from "@/lib/config";
 import {
   Delete,
   /* Edit removed */
@@ -16,12 +17,13 @@ import {
   GroupAdd,
   GroupRemove,
   Search,
-  SchoolOutlined,
   UploadFile,
   LocationOn,
-  Close,
   CheckCircleOutline,
   ErrorOutline,
+  SchoolOutlined,
+  PaletteOutlined,
+  BuildOutlined,
 } from "@mui/icons-material";
 import {
   Dialog,
@@ -36,7 +38,7 @@ import {
 import NotesPanel from "@/components/NotesPanel";
 
 /* ── Types ──────────────────────────────────────────── */
-interface ParsedSchool {
+interface ParsedEntity {
   name: string;
   address: string;
   phone: string;
@@ -55,13 +57,22 @@ type StatusKey =
   | "unassigned" | "assigned" | "not_interested";
 
 /* ── Main Component ─────────────────────────────────── */
-export default function SchoolsManagement() {
-  const [schools, setSchools]               = useState<School[]>([]);
+export default function EntitiesManagement() {
+  const [entities, setEntities]               = useState<Entity[]>([]);
   const [noteCounts, setNoteCounts]         = useState<Record<string, number>>({});
-  const [schoolsLoading, setSchoolsLoading] = useState(false);
+  const [entitiesLoading, setEntitiesLoading] = useState(false);
+  const [hasEntityTypeColumn, setHasEntityTypeColumn] = useState<boolean>(false);
+  const [totalCount, setTotalCount]         = useState<number>(0);
+  const [currentPage, setCurrentPage]       = useState<number>(1);
+  const [itemsPerPage, setItemsPerPage]     = useState<number>(20);
+
+  const effectiveItemsPerPage = itemsPerPage === -1 ? totalCount || 1 : itemsPerPage;
+  const totalPages = effectiveItemsPerPage > 0 ? Math.max(1, Math.ceil(totalCount / effectiveItemsPerPage)) : 1;
+  const displayStart = totalCount === 0 ? 0 : (currentPage - 1) * effectiveItemsPerPage + 1;
+  const displayEnd = totalCount === 0 ? 0 : Math.min(currentPage * effectiveItemsPerPage, totalCount);
   const [showUpload, setShowUpload]         = useState(false);
   const [showForm, setShowForm]             = useState(false);
-  const [editingSchool, setEditingSchool]   = useState<School | null>(null);
+  const [editingEntity, setEditingEntity]   = useState<Entity | null>(null);
   const [searchText, setSearchText]         = useState("");
   const [statusFilter, setStatusFilter]     = useState<string>("");
 
@@ -70,7 +81,7 @@ export default function SchoolsManagement() {
   // note: assignedUsers state removed since assignment UI gone
 
   // Bulk
-  const [selectedSchoolIds, setSelectedSchoolIds] = useState<string[]>([]);
+  const [selectedEntityIds, setSelectedEntityIds] = useState<string[]>([]);
   const [showBulkModal, setShowBulkModal]         = useState(false);
   const [bulkAssignedUsers, setBulkAssignedUsers] = useState<string[]>([]);
   const [bulkLoading, setBulkLoading]             = useState(false);
@@ -83,8 +94,8 @@ export default function SchoolsManagement() {
   const [message, setMessage]   = useState("");
 
   // Notes
-  const [notesSchoolId, setNotesSchoolId]     = useState<string | null>(null);
-  const [notesSchoolName, setNotesSchoolName] = useState<string>("");
+  const [notesEntityId, setNotesEntityId]     = useState<string | null>(null);
+  const [notesEntityName, setNotesEntityName] = useState<string>("");
 
   // Status update guard
   const [statusUpdating, setStatusUpdating] = useState<string | null>(null);
@@ -93,12 +104,22 @@ export default function SchoolsManagement() {
   const [addressPopup, setAddressPopup] = useState<{ name: string; address: string } | null>(null);
 
   // Delete confirmation modal
-  const [deleteModal, setDeleteModal] = useState<{ open: boolean; type: 'single' | 'bulk'; schoolId?: string; schoolName?: string }>(
+  const [deleteModal, setDeleteModal] = useState<{ open: boolean; type: 'single' | 'bulk'; entityId?: string; entityName?: string }>(
     { open: false, type: 'single' }
   );
 
   const { user } = useAuth();
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
+  const entityConfig = ENTITY_TYPES[CURRENT_ENTITY_TYPE];
+
+  const getIcon = (iconName: string) => {
+    switch (iconName) {
+      case 'SchoolOutlined': return <SchoolOutlined fontSize="small" />;
+      case 'PaletteOutlined': return <PaletteOutlined fontSize="small" />;
+      case 'BuildOutlined': return <BuildOutlined fontSize="small" />;
+      default: return <SchoolOutlined fontSize="small" />;
+    }
+  };
 
   /* ── Auto-dismiss message ─────────────────────────── */
   useEffect(() => {
@@ -107,15 +128,8 @@ export default function SchoolsManagement() {
     return () => clearTimeout(t);
   }, [message]);
 
-  /* ── Init ─────────────────────────────────────────── */
-  useEffect(() => {
-    if (!user) return;
-    fetchSchools();
-    if (user.role === "admin") fetchAllUsers();
-  }, [user]);
-
   /* ── Data fetches ─────────────────────────────────── */
-  const fetchAllUsers = async () => {
+  const fetchAllUsers = useCallback(async () => {
     try {
       const { data, error } = await supabase
         .from("users").select("*").eq("role", "user").order("name", { ascending: true });
@@ -124,51 +138,129 @@ export default function SchoolsManagement() {
     } catch (err) {
       console.error("Error fetching users:", err);
     }
-  };
+  }, [supabase]);
 
-  const fetchSchools = async () => {
-    if (!user) { setSchools([]); return; }
-    setSchoolsLoading(true);
+  const fetchEntities = useCallback(async (page: number = currentPage, perPage: number = itemsPerPage) => {
+    if (!user) { setEntities([]); return; }
+    setEntitiesLoading(true);
     try {
-      let query = supabase.from("schools").select("*");
-
-      if (user.role !== "admin") {
-        const { data: assignments, error: assignError } = await supabase
-          .from("user_school_assignments").select("school_id").eq("user_id", user.id);
-        if (assignError) throw assignError;
-        const assignedIds = assignments?.map((a: { school_id: string }) => a.school_id) || [];
-
-        if (assignedIds.length === 0 && !user.assigned_number) {
-          setSchools([]); setSchoolsLoading(false); return;
-        }
-        if (user.assigned_number) {
-          const phoneVal = user.assigned_number.replace(/'/g, "''");
-          query = assignedIds.length > 0
-            ? query.or(`id.in.(${assignedIds.join(",")}),phone.eq.${phoneVal}`)
-            : query.eq("phone", phoneVal);
-        } else {
-          query = query.in("id", assignedIds);
+      // Check if entity_type column exists
+      if (!hasEntityTypeColumn) {
+        try {
+          const { error } = await supabase.from("schools").select("entity_type").limit(1);
+          if (!error) {
+            setHasEntityTypeColumn(true);
+          }
+        } catch {
+          // Column doesn't exist, keep hasEntityTypeColumn as false
         }
       }
 
-      const { data, error } = await query.order("created_at", { ascending: false });
-      if (error) throw error;
-      const schoolList: School[] = data || [];
-      setSchools(schoolList);
+      let countQuery = supabase.from("schools").select("*", { count: "exact", head: true });
+      let dataQuery = supabase.from("schools").select("*");
 
+      // Apply entity_type filtering to both queries if column exists
+      if (hasEntityTypeColumn) {
+        if (CURRENT_ENTITY_TYPE !== 'school') {
+          countQuery = countQuery.eq("entity_type", CURRENT_ENTITY_TYPE);
+          dataQuery = dataQuery.eq("entity_type", CURRENT_ENTITY_TYPE);
+        } else {
+          countQuery = countQuery.or(`entity_type.eq.school,entity_type.is.null`);
+          dataQuery = dataQuery.or(`entity_type.eq.school,entity_type.is.null`);
+        }
+      }
+
+      // Apply user filtering to both queries
+      if (user.role !== "admin") {
+        try {
+          const { data: assignments, error: assignError } = await supabase
+            .from("user_school_assignments").select("school_id").eq("user_id", user.id);
+          if (assignError) {
+            console.error("Error fetching user assignments:", assignError);
+          } else {
+            const assignedIds = assignments?.map((a: { school_id: string }) => a.school_id) || [];
+
+            if (assignedIds.length === 0 && !user.assigned_number) {
+              setEntities([]); setTotalCount(0); setEntitiesLoading(false); return;
+            }
+            
+            if (user.assigned_number) {
+              const phoneVal = user.assigned_number.replace(/'/g, "''");
+              const filterCondition = assignedIds.length > 0
+                ? `id.in.(${assignedIds.join(",")}),phone.eq.${phoneVal}`
+                : `phone.eq.${phoneVal}`;
+              countQuery = countQuery.or(filterCondition);
+              dataQuery = dataQuery.or(filterCondition);
+            } else {
+              countQuery = countQuery.in("id", assignedIds);
+              dataQuery = dataQuery.in("id", assignedIds);
+            }
+          }
+        } catch (assignErr) {
+          console.error("Error in user assignment filtering:", assignErr);
+        }
+      }
+
+      // Get total count
+      const { count, error: countError } = await countQuery;
+      if (countError) throw countError;
+      const currentTotal = count || 0;
+      setTotalCount(currentTotal);
+
+      // Get paginated data
+      const fetchAllRows = perPage === -1;
+      const pageSize = fetchAllRows ? currentTotal : perPage;
+
+      const dataQueryWithOrder = dataQuery.order("created_at", { ascending: false });
+      const queryResult = fetchAllRows
+        ? await dataQueryWithOrder
+        : await dataQueryWithOrder.range((page - 1) * pageSize, (page * pageSize) - 1);
+
+      const { data, error } = queryResult;
+      if (error) throw error;
+      const entityList: Entity[] = data || [];
+      setEntities(entityList);
+
+      // Re-enable note counting with error handling
       const counts: Record<string, number> = {};
-      for (const s of schoolList) {
-        const { count } = await supabase
-          .from("notes").select("id", { head: true, count: "exact" }).eq("school_id", s.id);
-        counts[s.id] = count || 0;
+      for (const s of entityList) {
+        try {
+          const { count, error: countError } = await supabase
+            .from("notes").select("id", { head: true, count: "exact" }).eq("school_id", s.id);
+          if (countError) {
+            console.warn(`Error counting notes for entity ${s.id}:`, countError);
+            counts[s.id] = 0;
+          } else {
+            counts[s.id] = count || 0;
+          }
+        } catch (countErr) {
+          console.warn(`Error counting notes for entity ${s.id}:`, countErr);
+          counts[s.id] = 0;
+        }
       }
       setNoteCounts(counts);
     } catch (err) {
-      console.error("Error fetching schools:", err);
+      console.error("Error fetching entities:", err);
+      if (err && typeof err === 'object') {
+        console.error("Error details:", {
+          message: (err as any).message,
+          code: (err as any).code,
+          details: (err as any).details,
+          hint: (err as any).hint,
+        });
+      }
+      setMessage(`Error loading ${entityConfig.plural.toLowerCase()}. Please check the console for details.`);
     } finally {
-      setSchoolsLoading(false);
+      setEntitiesLoading(false);
     }
-  };
+  }, [user, hasEntityTypeColumn, currentPage, itemsPerPage, supabase, entityConfig.plural]);
+
+  /* ── Init ─────────────────────────────────────────── */
+  useEffect(() => {
+    if (!user) return;
+    fetchEntities(currentPage, itemsPerPage);
+    if (user.role === "admin") fetchAllUsers();
+  }, [user, currentPage, itemsPerPage, fetchAllUsers, fetchEntities]);
 
   /* ── Upload ───────────────────────────────────────── */
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -182,33 +274,49 @@ export default function SchoolsManagement() {
           const wb = XLSX.read(ev.target?.result, { type: "binary" });
           const ws = wb.Sheets[wb.SheetNames[0]];
           const rows = XLSX.utils.sheet_to_json(ws);
-          const parsed: ParsedSchool[] = (rows as any[])
+          const parsed: ParsedEntity[] = (rows as any[])
             .map((r) => ({
-              name:    r["School Name"] || r["name"] || "",
-              address: r["Address"]     || r["address"] || "",
-              phone:   String(r["Phone Number"] || r["phone"] || "").trim(),
+              name:    r[entityConfig.excelColumns[0]] || r["name"] || "",
+              address: r[entityConfig.excelColumns[1]] || r["address"] || "",
+              phone:   String(r[entityConfig.excelColumns[2]] || r["phone"] || "").trim(),
             }))
-            .filter((s) => s.name && s.address && s.phone);
+            .filter((e) => e.name && e.address && e.phone);
 
-          if (!parsed.length) throw new Error("No valid data. Columns: School Name, Address, Phone Number");
+          if (!parsed.length) throw new Error(`No valid data. Columns: ${entityConfig.excelColumns.join(", ")}`);
 
-          const { data: existing } = await supabase.from("schools").select("phone");
-          const existPhones = new Set(existing?.map((s: any) => s.phone) || []);
-          const toInsert: ParsedSchool[] = [];
+          // Check for duplicates - only filter by entity_type if column exists
+          let duplicateQuery = supabase.from("schools").select("phone");
+          if (hasEntityTypeColumn) {
+            duplicateQuery = duplicateQuery.eq("entity_type", CURRENT_ENTITY_TYPE);
+          }
+          const { data: existing } = await duplicateQuery;
+          const existPhones = new Set(existing?.map((e: any) => e.phone) || []);
+          const toInsert: ParsedEntity[] = [];
           const dupes: string[] = [];
-          parsed.forEach((s) => {
-            if (existPhones.has(s.phone)) { dupes.push(s.phone); }
-            else { toInsert.push(s); existPhones.add(s.phone); }
+          parsed.forEach((e) => {
+            if (existPhones.has(e.phone)) { dupes.push(e.phone); }
+            else { toInsert.push(e); existPhones.add(e.phone); }
           });
 
           if (!toInsert.length) throw new Error("All phone numbers already exist");
-          const { error: ins } = await supabase.from("schools")
-            .insert(toInsert.map((s) => ({ ...s, status: "new" })));
+          
+          // Prepare insert data - only include entity_type if column exists
+          const insertData = toInsert.map((e) => {
+            const baseData = { 
+              name: e.name, 
+              address: e.address, 
+              phone: e.phone, 
+              status: "new" as const 
+            };
+            return hasEntityTypeColumn ? { ...baseData, entity_type: CURRENT_ENTITY_TYPE } : baseData;
+          });
+          
+          const { error: ins } = await supabase.from("schools").insert(insertData);
           if (ins) throw ins;
 
-          setMessage(`Uploaded ${toInsert.length} schools${dupes.length ? `. Skipped ${dupes.length} duplicate(s).` : "."}`);
+          setMessage(`Uploaded ${toInsert.length} ${entityConfig.label.toLowerCase()}(s)${dupes.length ? `. Skipped ${dupes.length} duplicate(s).` : "."}`);
           setShowUpload(false);
-          await fetchSchools();
+          await fetchEntities(currentPage, itemsPerPage);
         } catch (err: any) {
           setMessage(`Error: ${err.message}`);
         }
@@ -223,37 +331,43 @@ export default function SchoolsManagement() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault(); setLoading(true); setMessage("");
     try {
-      if (editingSchool) {
+      if (editingEntity) {
         const { error } = await supabase.from("schools").update({
           name: formData.name, address: formData.address,
-          phone: formData.phone, status: formData.status || editingSchool.status,
+          phone: formData.phone, status: formData.status || editingEntity.status,
           updated_at: new Date().toISOString(),
-        }).eq("id", editingSchool.id);
+        }).eq("id", editingEntity.id);
         if (error) throw error;
-        setMessage("School updated successfully");
+        setMessage(`${entityConfig.label} updated successfully`);
       } else {
-        const { error } = await supabase.from("schools").insert({
-          name: formData.name, address: formData.address,
-          phone: formData.phone, status: formData.status || "new",
-        });
+        // Prepare insert data - only include entity_type if column exists
+        const insertData = {
+          name: formData.name, 
+          address: formData.address,
+          phone: formData.phone, 
+          status: formData.status || "new",
+        };
+        const finalInsertData = hasEntityTypeColumn ? { ...insertData, entity_type: CURRENT_ENTITY_TYPE } : insertData;
+        
+        const { error } = await supabase.from("schools").insert(finalInsertData);
         if (error) throw error;
-        setMessage("School created successfully");
+        setMessage(`${entityConfig.label} created successfully`);
       }
-      resetForm(); await fetchSchools();
+      resetForm(); await fetchEntities(currentPage, itemsPerPage);
     } catch (err) {
-      setMessage("Error saving school"); console.error(err);
+      setMessage(`Error saving ${entityConfig.label.toLowerCase()}`); console.error(err);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleDelete = async (schoolId: string, schoolName: string) => {
-    setDeleteModal({ open: true, type: 'single', schoolId, schoolName });
+  const handleDelete = async (entityId: string, entityName: string) => {
+    setDeleteModal({ open: true, type: 'single', entityId, entityName });
   };
 
 
   const resetForm = () => {
-    setShowForm(false); setEditingSchool(null);
+    setShowForm(false); setEditingEntity(null);
     setFormData({ name: "", address: "", phone: "", status: user?.role === "admin" ? "new" : "active" });
   };
 
@@ -261,29 +375,29 @@ export default function SchoolsManagement() {
   const openWhatsApp = (phone: string) => {
     let digits = phone.replace(/[^0-9]/g, "");
     if (!digits.startsWith("91")) digits = `91${digits}`;
-    window.open(`https://wa.me/${digits}?text=${encodeURIComponent("Hello! I'm contacting regarding your school.")}`, "_blank");
+    window.open(`https://wa.me/${digits}?text=${encodeURIComponent(`Hello! I'm contacting regarding your ${entityConfig.label.toLowerCase()}.`)}`, "_blank");
   };
-  const callSchool = (phone: string) => { window.location.href = `tel:${phone}`; };
+  const callEntity = (phone: string) => { window.location.href = `tel:${phone}`; };
 
   /* assignment modal logic removed - feature no longer used */
 
   /* ── Bulk actions ─────────────────────────────────── */
   const handleBulkToggleUser = async (userId: string) => {
-    if (!selectedSchoolIds.length) return;
+    if (!selectedEntityIds.length) return;
     const isAll = bulkAssignedUsers.includes(userId);
     try {
       if (isAll) {
         const { error } = await supabase.from("user_school_assignments")
-          .delete().eq("user_id", userId).in("school_id", selectedSchoolIds);
+          .delete().eq("user_id", userId).in("school_id", selectedEntityIds);
         if (error) throw error;
         setBulkAssignedUsers((p) => p.filter((id) => id !== userId));
       } else {
         const { error } = await supabase.from("user_school_assignments")
-          .insert(selectedSchoolIds.map((sid) => ({ user_id: userId, school_id: sid, assigned_by: user?.id })));
+          .insert(selectedEntityIds.map((sid) => ({ user_id: userId, school_id: sid, assigned_by: user?.id })));
         if (error) throw error;
         setBulkAssignedUsers((p) => [...p, userId]);
-        await supabase.from("schools").update({ status: "assigned" }).in("id", selectedSchoolIds);
-        setSchools((p) => p.map((s) => selectedSchoolIds.includes(s.id) ? { ...s, status: "assigned" } : s));
+        await supabase.from("schools").update({ status: "assigned" }).in("id", selectedEntityIds);
+        setEntities((p) => p.map((s) => selectedEntityIds.includes(s.id) ? { ...s, status: "assigned" } : s));
       }
     } catch (err) {
       setMessage("Error updating bulk assignment"); console.error(err);
@@ -291,8 +405,8 @@ export default function SchoolsManagement() {
   };
 
   const closeBulkModal = async () => {
-    setShowBulkModal(false); setBulkAssignedUsers([]); setSelectedSchoolIds([]);
-    await fetchSchools();
+    setShowBulkModal(false); setBulkAssignedUsers([]); setSelectedEntityIds([]);
+    await fetchEntities(currentPage, itemsPerPage);
   };
 
   const handleBulkDelete = async () => {
@@ -303,58 +417,58 @@ export default function SchoolsManagement() {
   const confirmDelete = async () => {
     setLoading(true);
     try {
-      if (deleteModal.type === 'single' && deleteModal.schoolId) {
-        const { error } = await supabase.from("schools").delete().eq("id", deleteModal.schoolId);
+      if (deleteModal.type === 'single' && deleteModal.entityId) {
+        const { error } = await supabase.from("schools").delete().eq("id", deleteModal.entityId);
         if (error) throw error;
-        setMessage("School deleted successfully");
+        setMessage(`${entityConfig.label} deleted successfully`);
       } else if (deleteModal.type === 'bulk') {
-        const { error } = await supabase.from("schools").delete().in("id", selectedSchoolIds);
+        const { error } = await supabase.from("schools").delete().in("id", selectedEntityIds);
         if (error) throw error;
-        setMessage(`Deleted ${selectedSchoolIds.length} school(s)`);
-        setSelectedSchoolIds([]);
+        setMessage(`Deleted ${selectedEntityIds.length} ${entityConfig.label.toLowerCase()}(s)`);
+        setSelectedEntityIds([]);
       }
       setDeleteModal({ open: false, type: 'single' });
-      await fetchSchools();
+      await fetchEntities(currentPage, itemsPerPage);
     } catch (err) {
-      setMessage("Error deleting school(s)"); console.error(err);
+      setMessage(`Error deleting ${entityConfig.label.toLowerCase()}(s)`); console.error(err);
     } finally {
       setLoading(false);
     }
   };
 
   const handleBulkUnassignAll = async () => {
-    if (!confirm(`Unassign all users from ${selectedSchoolIds.length} school(s)?`)) return;
+    if (!confirm(`Unassign all users from ${selectedEntityIds.length} ${entityConfig.label.toLowerCase()}(s)?`)) return;
     setLoading(true);
     try {
       const { error } = await supabase.from("user_school_assignments")
-        .delete().in("school_id", selectedSchoolIds);
+        .delete().in("school_id", selectedEntityIds);
       if (error) throw error;
       await supabase.from("schools")
         .update({ status: "unassigned", updated_at: new Date().toISOString() })
-        .in("id", selectedSchoolIds);
-      setSchools((p) => p.map((s) => selectedSchoolIds.includes(s.id) ? { ...s, status: "unassigned" } : s));
-      setMessage("Unassigned all users from selected schools");
-      await fetchSchools();
+        .in("id", selectedEntityIds);
+      setEntities((p) => p.map((e) => selectedEntityIds.includes(e.id) ? { ...e, status: "unassigned" } : e));
+      setMessage("Unassigned all users from selected entities");
+      await fetchEntities(currentPage, itemsPerPage);
     } catch (err) {
       setMessage("Error unassigning users"); console.error(err);
     } finally { setLoading(false); }
   };
 
   /* ── Status inline update ─────────────────────────── */
-  const handleStatusChange = async (school: School, val: StatusKey) => {
-    if (statusUpdating === school.id) return;
-    setStatusUpdating(school.id);
-    const prev = school.status;
-    setSchools((p) => p.map((s) => s.id === school.id ? { ...s, status: val } : s));
+  const handleStatusChange = async (entity: Entity, val: StatusKey) => {
+    if (statusUpdating === entity.id) return;
+    setStatusUpdating(entity.id);
+    const prev = entity.status;
+    setEntities((p) => p.map((s) => s.id === entity.id ? { ...s, status: val } : s));
     try {
       const { error } = await supabase.from("schools")
-        .update({ status: val, updated_at: new Date().toISOString() }).eq("id", school.id);
+        .update({ status: val, updated_at: new Date().toISOString() }).eq("id", entity.id);
       if (error) {
-        setSchools((p) => p.map((s) => s.id === school.id ? { ...s, status: prev } : s));
+        setEntities((p) => p.map((s) => s.id === entity.id ? { ...s, status: prev } : s));
         setMessage("Error updating status");
       }
     } catch {
-      setSchools((p) => p.map((s) => s.id === school.id ? { ...s, status: prev } : s));
+      setEntities((p) => p.map((s) => s.id === entity.id ? { ...s, status: prev } : s));
       setMessage("Error updating status");
     } finally {
       setStatusUpdating(null);
@@ -362,14 +476,14 @@ export default function SchoolsManagement() {
   };
 
   /* ── Filtered list ────────────────────────────────── */
-  const filteredSchools = schools.filter((s) => {
+  const filteredEntities = entities.filter((s) => {
     const matchesName   = s.name.toLowerCase().includes(searchText.toLowerCase());
     const matchesStatus = statusFilter ? s.status === statusFilter : true;
     return matchesName && matchesStatus;
   });
 
   const allChecked =
-    filteredSchools.length > 0 && selectedSchoolIds.length === filteredSchools.length;
+    filteredEntities.length > 0 && selectedEntityIds.length === filteredEntities.length;
 
   /* ── Render ───────────────────────────────────────── */
   return (
@@ -380,16 +494,16 @@ export default function SchoolsManagement() {
         <div className={styles.header}>
           <div className={styles.titleBlock}>
             <div className={styles.titleIcon}>
-              <SchoolOutlined fontSize="small" />
+              {getIcon(entityConfig.icon)}
             </div>
-            <h2 className={styles.pageTitle}>Schools Management</h2>
+            <h2 className={styles.pageTitle}>Data Management</h2>
           </div>
 
           <div className={styles.headerActions}>
             {user?.role === "admin" && (
               <>
                 <button className={styles.btnPrimary} onClick={() => setShowForm(true)}>
-                  <Add fontSize="small" /> Add School
+                  <Add fontSize="small" /> Add Data
                 </button>
                 <button className={styles.btnOutline} onClick={() => setShowUpload((v) => !v)}>
                   <UploadFile fontSize="small" /> Upload Excel
@@ -412,8 +526,9 @@ export default function SchoolsManagement() {
         {/* Upload panel */}
         {showUpload && (
           <div className={styles.uploadPanel}>
-            <h3>Upload Schools from Excel</h3>
-            <p>Columns required: <strong>School Name</strong>, <strong>Address</strong>, <strong>Phone Number</strong></p>
+            <h3>Upload Data from Excel</h3>
+            {/* <p>Columns required: <strong>{entityConfig.excelColumns.join('</strong>, <strong>')}</strong></p> */}
+            <p>Columns required: Name, Address, Phone Number</p>
             <input
               type="file" accept=".xlsx,.xls,.csv"
               onChange={handleFileUpload}
@@ -425,13 +540,13 @@ export default function SchoolsManagement() {
         )}
 
         {/* Notes panel */}
-        {notesSchoolId && (
+        {notesEntityId && (
           <NotesPanel
-            schoolId={notesSchoolId}
-            schoolName={notesSchoolName}
-            onClose={() => { setNotesSchoolId(null); setNotesSchoolName(""); }}
+            entityId={notesEntityId}
+            entityName={notesEntityName}
+            onClose={() => { setNotesEntityId(null); setNotesEntityName(""); }}
             onNoteCountChange={(count) =>
-              setNoteCounts((p) => ({ ...p, [notesSchoolId]: count }))
+              setNoteCounts((p) => ({ ...p, [notesEntityId]: count }))
             }
           />
         )}
@@ -443,7 +558,7 @@ export default function SchoolsManagement() {
             <input
               value={searchText}
               onChange={(e) => setSearchText(e.target.value)}
-              placeholder="Search schools…"
+              placeholder="Search"
             />
           </div>
           <select
@@ -463,9 +578,9 @@ export default function SchoolsManagement() {
         </div>
 
         {/* Bulk bar */}
-        {selectedSchoolIds.length > 0 && (
+        {selectedEntityIds.length > 0 && (
           <div className={styles.bulkBar}>
-            <span className={styles.bulkCount}>{selectedSchoolIds.length} selected</span>
+            <span className={styles.bulkCount}>{selectedEntityIds.length} selected</span>
             <div className={styles.bulkActions}>
               {user?.role === "admin" && (
                 <>
@@ -477,13 +592,13 @@ export default function SchoolsManagement() {
                         const { data } = await supabase
                           .from("user_school_assignments")
                           .select("user_id, school_id")
-                          .in("school_id", selectedSchoolIds);
+                          .in("school_id", selectedEntityIds);
                         const countMap: Record<string, number> = {};
                         (data || []).forEach((r: any) => {
                           countMap[r.user_id] = (countMap[r.user_id] || 0) + 1;
                         });
                         setBulkAssignedUsers(
-                          allUsers.filter((u) => countMap[u.id] === selectedSchoolIds.length).map((u) => u.id)
+                          allUsers.filter((u) => countMap[u.id] === selectedEntityIds.length).map((u) => u.id)
                         );
                       } catch { setMessage("Error loading assignments"); }
                       finally { setBulkLoading(false); }
@@ -513,12 +628,12 @@ export default function SchoolsManagement() {
                     type="checkbox" className={styles.checkbox}
                     checked={allChecked}
                     onChange={(e) =>
-                      setSelectedSchoolIds(e.target.checked ? filteredSchools.map((s) => s.id) : [])
+                      setSelectedEntityIds(e.target.checked ? filteredEntities.map((e) => e.id) : [])
                     }
                   />
                 </th>
                 <th className={styles.colNo}>No.</th>
-                <th className={styles.colName}>School Name</th>
+                <th className={styles.colName}>Name</th>
                 <th className={styles.colAddress}>Address</th>
                 <th className={styles.colPhone}>Phone</th>
                 <th className={styles.colDate}>Date</th>
@@ -527,56 +642,55 @@ export default function SchoolsManagement() {
               </tr>
             </thead>
             <tbody>
-              {schoolsLoading ? (
+              {entitiesLoading ? (
                 <tr className={styles.loadingRow}>
                   <td colSpan={8}>
                     <CircularProgress size={22} style={{ color: "#c8a96e" }} />
                   </td>
                 </tr>
-              ) : filteredSchools.length === 0 ? (
+              ) : filteredEntities.length === 0 ? (
                 <tr>
                   <td colSpan={8}>
                     <div className={styles.emptyState}>
-                      <div className={styles.emptyIcon}>🏫</div>
-                      No schools found
+                      No Data found
                     </div>
                   </td>
                 </tr>
               ) : (
-                filteredSchools.map((school, idx) => (
+                filteredEntities.map((entity, idx) => (
                   <tr
-                    key={school.id}
-                    className={selectedSchoolIds.includes(school.id) ? styles.rowSelected : ""}
+                    key={entity.id}
+                    className={selectedEntityIds.includes(entity.id) ? styles.rowSelected : ""}
                   >
                     {/* Checkbox */}
                     <td className={styles.colCheckbox}>
                       <input
                         type="checkbox" className={styles.checkbox}
-                        checked={selectedSchoolIds.includes(school.id)}
+                        checked={selectedEntityIds.includes(entity.id)}
                         onChange={(e) =>
-                          setSelectedSchoolIds((p) =>
-                            e.target.checked ? [...p, school.id] : p.filter((id) => id !== school.id)
+                          setSelectedEntityIds((p) =>
+                            e.target.checked ? [...p, entity.id] : p.filter((id) => id !== entity.id)
                           )
                         }
                       />
                     </td>
 
                     {/* No */}
-                    <td className={styles.colNo}>{idx + 1}</td>
+                    <td className={styles.colNo}>{(currentPage - 1) * effectiveItemsPerPage + idx + 1}</td>
 
                     {/* Name */}
-                    <td className={styles.colName}>{school.name}</td>
+                    <td className={styles.colName}>{entity.name}</td>
 
                     {/* Address — truncated + popup */}
                     <td className={styles.colAddress}>
                       <div className={styles.addressCell}>
                         <span className={styles.addressText}>
-                          {truncateAddress(school.address)}
+                          {truncateAddress(entity.address)}
                         </span>
                         <Tooltip title="View full address">
                           <button
                             className={styles.addressExpand}
-                            onClick={() => setAddressPopup({ name: school.name, address: school.address })}
+                            onClick={() => setAddressPopup({ name: entity.name, address: entity.address })}
                           >
                             <LocationOn style={{ fontSize: "1rem" }} />
                           </button>
@@ -585,11 +699,11 @@ export default function SchoolsManagement() {
                     </td>
 
                     {/* Phone */}
-                    <td className={styles.colPhone}>{school.phone}</td>
+                    <td className={styles.colPhone}>{entity.phone}</td>
 
                     {/* Date */}
                     <td className={styles.colDate}>
-                      {new Date(school.created_at).toLocaleDateString()}
+                      {new Date(entity.created_at).toLocaleDateString()}
                     </td>
 
                     {/* Status */}
@@ -597,9 +711,9 @@ export default function SchoolsManagement() {
                       {user?.role === "admin" ? (
                         <select
                           className={styles.statusSelect}
-                          value={school.status}
-                          disabled={statusUpdating === school.id}
-                          onChange={(e) => handleStatusChange(school, e.target.value as StatusKey)}
+                          value={entity.status}
+                          disabled={statusUpdating === entity.id}
+                          onChange={(e) => handleStatusChange(entity, e.target.value as StatusKey)}
                         >
                           <option value="new">New</option>
                           <option value="active">Active</option>
@@ -612,8 +726,8 @@ export default function SchoolsManagement() {
                       ) : (
                         <select
                           className={styles.statusSelect}
-                          value={school.status}
-                          onChange={(e) => handleStatusChange(school, e.target.value as StatusKey)}
+                          value={entity.status}
+                          onChange={(e) => handleStatusChange(entity, e.target.value as StatusKey)}
                         >
                           <option value="active">Active</option>
                           <option value="interested">Interested</option>
@@ -626,13 +740,13 @@ export default function SchoolsManagement() {
                     {/* Actions */}
                     <td className={styles.colActions}>
                       <Tooltip title="Call">
-                        <button className={`${styles.actionBtn} ${styles.call}`} onClick={() => callSchool(school.phone)}>
+                        <button className={`${styles.actionBtn} ${styles.call}`} onClick={() => callEntity(entity.phone)}>
                           <Call style={{ fontSize: "0.95rem" }} />
                         </button>
                       </Tooltip>
 
                       <Tooltip title="WhatsApp">
-                        <button className={`${styles.actionBtn} ${styles.whatsapp}`} onClick={() => openWhatsApp(school.phone)}>
+                        <button className={`${styles.actionBtn} ${styles.whatsapp}`} onClick={() => openWhatsApp(entity.phone)}>
                           <WhatsApp style={{ fontSize: "0.95rem" }} />
                         </button>
                       </Tooltip>
@@ -640,10 +754,10 @@ export default function SchoolsManagement() {
                       <Tooltip title="Notes">
                         <button
                           className={`${styles.actionBtn} ${styles.notes}`}
-                          disabled={schoolsLoading}
-                          onClick={() => { setNotesSchoolId(school.id); setNotesSchoolName(school.name); }}
+                          disabled={entitiesLoading}
+                          onClick={() => { setNotesEntityId(entity.id); setNotesEntityName(entity.name); }}
                         >
-                          <Badge badgeContent={noteCounts[school.id] || 0} color="primary"
+                          <Badge badgeContent={noteCounts[entity.id] || 0} color="primary"
                             sx={{ "& .MuiBadge-badge": { fontSize: "0.6rem", minWidth: "14px", height: "14px" } }}>
                             <NoteAdd style={{ fontSize: "0.95rem" }} />
                           </Badge>
@@ -652,7 +766,7 @@ export default function SchoolsManagement() {
 
                       {/* Delete always visible */}
                       <Tooltip title="Delete">
-                        <button className={`${styles.actionBtn} ${styles.delete}`} onClick={() => handleDelete(school.id, school.name)}>
+                        <button className={`${styles.actionBtn} ${styles.delete}`} onClick={() => handleDelete(entity.id, entity.name)}>
                           <Delete style={{ fontSize: "0.95rem" }} />
                         </button>
                       </Tooltip>
@@ -663,6 +777,68 @@ export default function SchoolsManagement() {
             </tbody>
           </table>
         </div>
+
+        {/* Pagination */}
+        {totalCount > 0 && (
+          <div className={styles.pagination}>
+            <div className={styles.paginationControls}>
+              <div className={styles.itemsPerPage}>
+                <label htmlFor="itemsPerPage">Show:</label>
+                <select
+                  id="itemsPerPage"
+                  value={itemsPerPage}
+                  onChange={(e) => {
+                    const newPerPage = Number(e.target.value);
+                    setItemsPerPage(newPerPage);
+                    setCurrentPage(1); // Reset to first page
+                    fetchEntities(1, newPerPage);
+                  }}
+                  className={styles.perPageSelect}
+                >
+                  <option value={10}>10</option>
+                  <option value={20}>20</option>
+                  <option value={50}>50</option>
+                  <option value={100}>100</option>
+                  <option value={-1}>All</option>
+                </select>
+              </div>
+
+              <div className={styles.pageInfo}>
+                Showing {displayStart} to {displayEnd} of {totalCount} entries
+              </div>
+
+              <div className={styles.pageButtons}>
+                <button
+                  className={styles.pageBtn}
+                  disabled={currentPage === 1}
+                  onClick={() => {
+                    const newPage = currentPage - 1;
+                    setCurrentPage(newPage);
+                    fetchEntities(newPage, itemsPerPage);
+                  }}
+                >
+                  Previous
+                </button>
+
+                <span className={styles.pageNumber}>
+                  Page {currentPage} of {totalPages}
+                </span>
+
+                <button
+                  className={styles.pageBtn}
+                  disabled={currentPage >= totalPages}
+                  onClick={() => {
+                    const newPage = Math.min(currentPage + 1, totalPages);
+                    setCurrentPage(newPage);
+                    fetchEntities(newPage, itemsPerPage);
+                  }}
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* ── Address Popup (Dialog) ────────────────────────── */}
@@ -692,7 +868,7 @@ export default function SchoolsManagement() {
       <Dialog open={showForm} onClose={resetForm} fullWidth maxWidth="sm"
         PaperProps={{ sx: { background: "#111827", color: "#f0ece4", border: "1px solid rgba(255,255,255,0.07)", borderRadius: "12px" } }}>
         <DialogTitle sx={{ fontFamily: "'Playfair Display', serif", background: "#1a2236", borderBottom: "1px solid rgba(255,255,255,0.07)", color: "#f0ece4" }}>
-          {editingSchool ? "Edit School" : "Add New School"}
+          {editingEntity ? `Edit ${entityConfig.label}` : `Add New ${entityConfig.label}`}
         </DialogTitle>
         <form onSubmit={handleSubmit}>
           <DialogContent sx={{ background: "#111827", pt: 2 }}>
@@ -753,7 +929,7 @@ export default function SchoolsManagement() {
           <DialogActions sx={{ background: "#1a2236", borderTop: "1px solid rgba(255,255,255,0.07)", px: 2, py: 1.2 }}>
             <button type="button" className={styles.btnOutline} onClick={resetForm}>Cancel</button>
             <button type="submit" className={styles.btnPrimary} disabled={loading}>
-              {loading ? "Saving…" : "Save School"}
+              {loading ? "Saving…" : `Save ${entityConfig.label}`}
             </button>
           </DialogActions>
         </form>
@@ -765,12 +941,12 @@ export default function SchoolsManagement() {
       <Dialog open={showBulkModal} onClose={closeBulkModal} fullWidth maxWidth="sm"
         PaperProps={{ sx: { background: "#111827", color: "#f0ece4", border: "1px solid rgba(255,255,255,0.07)", borderRadius: "12px" } }}>
         <DialogTitle sx={{ fontFamily: "'Playfair Display', serif", background: "#1a2236", borderBottom: "1px solid rgba(255,255,255,0.07)", color: "#f0ece4", display: "flex", alignItems: "center", gap: 1 }}>
-          Bulk Assign — {selectedSchoolIds.length} school(s)
+          Bulk Assign — {selectedEntityIds.length} {entityConfig.label.toLowerCase()}(s)
           {bulkLoading && <CircularProgress size={16} sx={{ color: "#c8a96e", ml: 1 }} />}
         </DialogTitle>
         <DialogContent sx={{ background: "#111827", p: "1.25rem 1.5rem" }}>
           <p style={{ fontSize: "0.82rem", color: "#9ca3af", marginBottom: "1rem" }}>
-            Schools are auto-marked <strong style={{ color: "#c084fc" }}>assigned</strong> when a user is added.
+            {entityConfig.plural} are auto-marked <strong style={{ color: "#c084fc" }}>assigned</strong> when a user is added.
           </p>
           {allUsers.map((u) => (
             <div key={u.id} className={styles.userRow}>
@@ -793,13 +969,13 @@ export default function SchoolsManagement() {
       <Dialog open={deleteModal.open} onClose={() => setDeleteModal({ open: false, type: 'single' })} fullWidth maxWidth="sm"
         PaperProps={{ sx: { background: "#111827", color: "#f0ece4", border: "1px solid rgba(255,255,255,0.07)", borderRadius: "12px" } }}>
         <DialogTitle sx={{ fontFamily: "'Playfair Display', serif", background: "#1a2236", borderBottom: "1px solid rgba(255,255,255,0.07)", color: "#f0ece4" }}>
-          Delete {deleteModal.type === 'bulk' ? 'Schools' : 'School'}?
+          Delete {deleteModal.type === 'bulk' ? entityConfig.plural : entityConfig.label}?
         </DialogTitle>
         <DialogContent sx={{ background: "#111827", pt: 2, pb: 1 }}>
           <p style={{ color: "#f0ece4", marginBottom: "0.5rem" }}>
             {deleteModal.type === 'single'
-              ? `Are you sure you want to delete "${deleteModal.schoolName}"?`
-              : `Are you sure you want to delete ${selectedSchoolIds.length} school(s)?`}
+              ? `Are you sure you want to delete "${deleteModal.entityName}"?`
+              : `Are you sure you want to delete ${selectedEntityIds.length} ${entityConfig.label.toLowerCase()}(s)?`}
           </p>
           <p style={{ fontSize: "0.82rem", color: "#ef4444" }}>
             This action cannot be undone.

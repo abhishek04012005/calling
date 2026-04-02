@@ -1,6 +1,6 @@
 # API & Extension Guide
 
-Advanced guide for understanding and extending the School Management Dashboard.
+Advanced guide for understanding and extending the Data Management Portal.
 
 ## Supabase API Operations
 
@@ -402,8 +402,8 @@ import * as XLSX from "xlsx";
 const exportToExcel = (data: School[]) => {
   const worksheet = XLSX.utils.json_to_sheet(data);
   const workbook = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(workbook, worksheet, "Schools");
-  XLSX.writeFile(workbook, "schools.xlsx");
+  XLSX.utils.book_append_sheet(workbook, worksheet, "Entities");
+  XLSX.writeFile(workbook, "entities.xlsx");
 };
 ```
 
@@ -444,7 +444,7 @@ useEffect(() => {
 // In JSX
 <input
   type="text"
-  placeholder="Search schools..."
+  placeholder="Search entities..."
   value={searchTerm}
   onChange={(e) => setSearchTerm(e.target.value)}
 />

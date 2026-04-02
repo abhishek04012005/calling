@@ -1,8 +1,8 @@
 # Project Summary
 
-## 🎯 Complete School Management Admin Dashboard
+## 🎯 Complete Data Management Portal
 
-A production-ready Next.js TypeScript application built with Supabase backend, featuring comprehensive school, user, and task management with a responsive mobile-first design.
+A production-ready Next.js TypeScript application built with Supabase backend, featuring comprehensive entity (schools, interior design firms, construction companies, etc.), user, and task management with a responsive mobile-first design.
 
 **Build Status:** ✅ Successfully compiled and ready to run
 
@@ -37,15 +37,15 @@ A production-ready Next.js TypeScript application built with Supabase backend, f
 - Task description support
 - Timestamps for creation and updates
 
-#### 4. **Schools Management**
-- **Manual Entry**: Form-based school creation
+#### 4. **Entity Management**
+- **Manual Entry**: Form-based entity creation
 - **Excel Upload**: 
   - Client-side parsing using xlsx library
-  - Expected columns: "School Name", "Address", "Phone Number"
-  - Bulk insert into `schools` table
+  - Configurable columns based on entity type (e.g., "School Name", "Address", "Phone Number" for schools; "Firm Name", "Address", "Phone Number" for interior design firms)
+  - Bulk insert into `entities` table
   - Error handling for invalid files
 - **Responsive Table Display**:
-  - School Name
+  - Entity Name
   - Address
   - Phone Number
   - Status toggle (active/inactive)
@@ -56,12 +56,12 @@ A production-ready Next.js TypeScript application built with Supabase backend, f
   - 🗑️ **Delete**: Remove school record
 
 #### 5. **Notes System**
-- Attach notes to each school
+- Attach notes to each entity
 - Display author name and creation timestamp
 - Add, edit, delete notes functionality
 - Users can only edit/delete their own notes
 - Multiline note content support
-- Distinct visual panel with school context
+- Distinct visual panel with entity context
 
 #### 6. **Responsive Design**
 - Mobile-first CSS approach
@@ -100,8 +100,8 @@ datacalling2/
 │   │   ├── LoginForm.tsx            # Email/password validation
 │   │   ├── UserManagement.tsx       # User CRUD operations
 │   │   ├── TaskManagement.tsx       # Task CRUD and status management
-│   │   ├── SchoolsManagement.tsx    # Schools CRUD, Excel upload
-│   │   └── NotesPanel.tsx           # School notes with timestamps
+│   │   ├── EntitiesManagement.tsx    # Entity CRUD, Excel upload
+│   │   └── NotesPanel.tsx           # Entity notes with timestamps
 │   │
 │   ├── context/
 │   │   └── AuthContext.tsx          # Authentication state & localStorage
@@ -319,15 +319,15 @@ npm run lint         # Check code quality
 - Display task creator
 - Timestamp tracking
 
-### SchoolsManagement.tsx
-- Fetch all schools on load
+### EntitiesManagement.tsx
+- Fetch all entities on load
 - **Excel Upload**:
   - File input validation
   - XLSX parsing
   - Column mapping
   - Bulk INSERT
   - Error handling
-- Manual school creation form
+- Manual entity creation form
 - Edit school details
 - Delete with confirmation
 - Status toggle (active/inactive)
@@ -397,13 +397,13 @@ npm run lint         # Check code quality
 6. Click Save
 7. Change status from table dropdown (instant update)
 
-### Schools Management
-1. Click "Schools" tab
-2. Click "Add School" or "Upload Excel"
+### Entity Management
+1. Click "Entities" tab
+2. Click "Add Entity" or "Upload Excel"
 3. For Excel: 
-   - Prepare file with: School Name | Address | Phone Number columns
+   - Prepare file with: Entity Name | Address | Phone Number columns
    - Click file input and select
-   - Schools appear in table
+   - Entities appear in table
 4. Click phone/WhatsApp icons to test actions
 5. Click Edit to modify
 6. Click status dropdown to toggle active/inactive

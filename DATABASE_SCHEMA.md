@@ -1,6 +1,6 @@
 # Database Schema
 
-Complete PostgreSQL schema for the School Management Dashboard.
+Complete PostgreSQL schema for the Data Management Portal.
 
 ## Run All Schemas
 
@@ -42,10 +42,11 @@ CREATE INDEX tasks_status_idx ON tasks(status);
 CREATE INDEX tasks_created_at_idx ON tasks(created_at);
 
 -- ============================================
--- SCHOOLS TABLE
+-- SCHOOLS TABLE (with optional entity_type support for backward compatibility)
 -- ============================================
 CREATE TABLE schools (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  entity_type VARCHAR(100) DEFAULT 'school', -- Optional: e.g., 'school', 'interior', 'construction', etc.
   name VARCHAR(255) NOT NULL,
   address TEXT NOT NULL,
   phone VARCHAR(50) NOT NULL,
@@ -56,6 +57,7 @@ CREATE TABLE schools (
 
 CREATE INDEX schools_status_idx ON schools(status);
 CREATE INDEX schools_name_idx ON schools(name);
+-- CREATE INDEX schools_entity_type_idx ON schools(entity_type); -- Uncomment if entity_type column is added
 CREATE INDEX schools_created_at_idx ON schools(created_at);
 
 -- ============================================
@@ -74,6 +76,20 @@ CREATE TABLE notes (
 CREATE INDEX notes_school_id_idx ON notes(school_id);
 CREATE INDEX notes_author_id_idx ON notes(author_id);
 CREATE INDEX notes_created_at_idx ON notes(created_at);
+
+-- ============================================
+-- USER_SCHOOL_ASSIGNMENTS TABLE
+-- ============================================
+CREATE TABLE user_school_assignments (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  school_id UUID NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+  assigned_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(user_id, school_id)
+);
+
+CREATE INDEX user_school_assignments_user_id_idx ON user_school_assignments(user_id);
+CREATE INDEX user_school_assignments_school_id_idx ON user_school_assignments(school_id);
 ```
 
 ## Table Definitions

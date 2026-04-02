@@ -18,7 +18,7 @@
 ### ✅ Protected Dashboard
 - [x] Admin-only access (role-based)
 - [x] Redirect unauthorized users
-- [x] Tab navigation (Schools, Users, Tasks)
+- [x] Tab navigation (Entities, Users, Tasks)
 - [x] Logout button with session clearing
 - [x] Display current user info
 - [x] Responsive header and navigation
@@ -42,10 +42,10 @@
 - [x] Edit and delete tasks
 - [x] Display assigned user name in table
 
-### ✅ Schools Management
+### ✅ Entity Management
 - [x] File upload control accepting Excel files
 - [x] Client-side parsing with `xlsx` library
-- [x] Parse rows into school objects
+- [x] Parse rows into entity objects
 - [x] Insert parsed data into `schools` table
 - [x] Responsive table showing:
   - [x] School Name
@@ -61,7 +61,7 @@
 - [x] Status toggle from table dropdown
 
 ### ✅ Notes System
-- [x] Notes panel attached to schools
+- [x] Notes panel attached to entities
 - [x] Add notes with content
 - [x] Edit notes (author only)
 - [x] Delete notes (author only)
@@ -129,7 +129,7 @@
 ✅ `src/components/LoginForm.tsx` - Login form component (91 lines)
 ✅ `src/components/UserManagement.tsx` - User CRUD (273 lines)
 ✅ `src/components/TaskManagement.tsx` - Task CRUD (326 lines)
-✅ `src/components/SchoolsManagement.tsx` - School CRUD + Excel (396 lines)
+✅ `src/components/EntitiesManagement.tsx` - Entity CRUD + Excel (396 lines)
 ✅ `src/components/NotesPanel.tsx` - Notes system (224 lines)
 ✅ `src/context/AuthContext.tsx` - Auth context (50 lines)
 ✅ `src/lib/supabase.ts` - Supabase client (9 lines)
@@ -194,7 +194,7 @@
 | **Login** | LoginForm.tsx | ✅ Complete | 91 | Email/password validation, localStorage |
 | **Users** | UserManagement.tsx | ✅ Complete | 273 | Full CRUD, role assignment, timestamps |
 | **Tasks** | TaskManagement.tsx | ✅ Complete | 326 | Assignment, status toggle, full CRUD |
-| **Schools** | SchoolsManagement.tsx | ✅ Complete | 396 | Excel upload, manual entry, actions, toggle |
+| **Entities** | EntitiesManagement.tsx | ✅ Complete | 396 | Excel upload, manual entry, actions, toggle |
 | **Notes** | NotesPanel.tsx | ✅ Complete | 224 | Author tracking, timestamps, edit/delete |
 | **Auth** | AuthContext.tsx | ✅ Complete | 50 | Session management, localStorage |
 | **Dashboard** | dashboard/page.tsx | ✅ Complete | 146 | Tab nav, protected route, responsive |
@@ -239,12 +239,12 @@
 ✅ Delete task (with confirmation)
 ✅ Shows assigned user in table
 
-### School Management
-✅ View all schools in responsive table
-✅ Create school manually
-✅ Upload Excel file with schools
-✅ Edit school details
-✅ Delete school (with confirmation)
+### Entity Management
+✅ View all entities in responsive table
+✅ Create entity manually
+✅ Upload Excel file with entities
+✅ Edit entity details
+✅ Delete entity (with confirmation)
 ✅ Toggle status active/inactive
 ✅ Call button opens dial
 ✅ WhatsApp button opens wa.me

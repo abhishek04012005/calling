@@ -1,6 +1,6 @@
 # Quick Start Guide
 
-Get the School Management Dashboard running in 5 minutes!
+Get the Data Management Portal running in 5 minutes!
 
 ## 1. Install & Configure (2 minutes)
 
@@ -42,8 +42,8 @@ Visit http://localhost:3000
 ✅ **Login Page** - Email/password authentication
 ✅ **User Management** - Create, edit, delete users
 ✅ **Task Management** - Assign tasks with status tracking
-✅ **Schools Management** - Manual entry + Excel upload
-✅ **Notes System** - Attach notes to schools
+✅ **Entity Management** - Manual entry + Excel upload
+✅ **Notes System** - Attach notes to entities
 ✅ **Responsive Design** - Mobile-first CSS
 ✅ **Material UI Icons** - Call, WhatsApp, Edit, Delete
 
@@ -85,7 +85,7 @@ Visit http://localhost:3000
    ```css
    --primary-color: #0066cc;  /* Change your color */
    ```
-3. **Add More Data** - Use the app UI to create schools and users
+3. **Add More Data** - Use the app UI to create entities and users
 4. **Deploy** - Push to Vercel: `vercel deploy`
 
 ## Troubleshooting

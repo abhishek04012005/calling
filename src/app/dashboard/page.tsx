@@ -3,20 +3,23 @@
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth, setAuthUser } from "@/context/AuthContext";
+import { CURRENT_ENTITY_TYPE, ENTITY_TYPES } from "@/lib/config";
 import UserManagement from "@/components/UserManagement";
 import TaskManagement from "@/components/TaskManagement";
-import SchoolsManagement from "@/components/SchoolsManagement";
+import EntitiesManagement from "@/components/EntitiesManagement";
 import {
   Logout,
-  SchoolOutlined,
   PeopleOutlined,
   TaskAltOutlined,
   DashboardOutlined,
   AdminPanelSettingsOutlined,
+  SchoolOutlined,
+  PaletteOutlined,
+  BuildOutlined,
 } from "@mui/icons-material";
 import styles from "./dashboard.module.css";
 
-type TabType = "schools" | "users" | "tasks";
+type TabType = "entities" | "users" | "tasks";
 
 /* ── Helper: initials from name ─────────────────────── */
 function getInitials(name: string): string {
@@ -28,10 +31,20 @@ function getInitials(name: string): string {
     .slice(0, 2);
 }
 
+/* ── Helper: get entity icon ────────────────────────── */
+function getEntityIcon(iconName: string) {
+  switch (iconName) {
+    case 'SchoolOutlined': return <SchoolOutlined className={styles.tabIcon} />;
+    case 'PaletteOutlined': return <PaletteOutlined className={styles.tabIcon} />;
+    case 'BuildOutlined': return <BuildOutlined className={styles.tabIcon} />;
+    default: return <SchoolOutlined className={styles.tabIcon} />;
+  }
+}
+
 export default function Dashboard() {
   const { user, isLoading, setUser } = useAuth();
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<TabType>("schools");
+  const [activeTab, setActiveTab] = useState<TabType>("entities");
 
   useEffect(() => {
     if (!isLoading && !user) {
@@ -76,9 +89,9 @@ export default function Dashboard() {
 
   /* ── Tab definitions ──────────────────────────────── */
   const tabs: { id: TabType; label: string; icon: React.ReactNode; adminOnly?: boolean }[] = [
-    { id: "schools", label: "Schools",  icon: <SchoolOutlined    className={styles.tabIcon} /> },
-    { id: "users",   label: "Users",    icon: <PeopleOutlined    className={styles.tabIcon} />, adminOnly: true },
-    { id: "tasks",   label: "Tasks",    icon: <TaskAltOutlined   className={styles.tabIcon} /> },
+    { id: "entities", label: "Entities",  icon: getEntityIcon(ENTITY_TYPES[CURRENT_ENTITY_TYPE].icon) },
+    { id: "users",     label: "Users",     icon: <PeopleOutlined    className={styles.tabIcon} />, adminOnly: true },
+    { id: "tasks",     label: "Tasks",     icon: <TaskAltOutlined   className={styles.tabIcon} /> },
   ];
 
   const visibleTabs = tabs.filter((t) => !t.adminOnly || user.role === "admin");
@@ -102,7 +115,7 @@ export default function Dashboard() {
             <p className={styles.brandTitle}>
               {user.role === "admin" ? "Admin Dashboard" : "Dashboard"}
             </p>
-            <p className={styles.brandSub}>School Management Portal</p>
+            <p className={styles.brandSub}>Data Management Portal</p>
             <p className={styles.mobileUserName}>{user.name}</p>
           </div>
         </div>
@@ -147,7 +160,7 @@ export default function Dashboard() {
 
       {/* ── Content ─────────────────────────────────── */}
       <main className={styles.main}>
-        {activeTab === "schools" && <SchoolsManagement />}
+        {activeTab === "entities" && <EntitiesManagement />}
         {activeTab === "users"   && user.role === "admin" && <UserManagement />}
         {activeTab === "tasks"   && <TaskManagement />}
       </main>

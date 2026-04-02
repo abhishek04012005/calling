@@ -226,7 +226,7 @@ export default function TaskManagement() {
                     className={styles.formInput}
                     value={formData.title}
                     onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                    placeholder="e.g. Follow up with school"
+                    placeholder="e.g. Follow up with contact"
                     required
                   />
                 </div>

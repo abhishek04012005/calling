@@ -1,19 +1,20 @@
-# School Management Admin Dashboard
+# Data Management Portal
 
-A modern, responsive Next.js TypeScript application with Supabase backend for managing schools, users, tasks, and notes with Material UI components.
+A modern, responsive Next.js TypeScript application with Supabase backend for managing entities (schools, interior design firms, construction companies, etc.), users, tasks, and notes with Material UI components.
 
 ## Features
 
 - **Authentication**: Login system with email/password validation against a users table
 - **User Management**: Admin can create, edit, delete users and assign roles (admin/user)
 - **Task Management**: Assign tasks to users with status tracking (pending/in-progress/completed)
-- **Schools Management**: 
+- **Entity Management**: 
+  - Configurable entity types (schools, interior design firms, construction companies, etc.)
   - Manual entry and Excel file upload (client-side parsing with xlsx)
-  - Responsive table with school name, address, phone number
+  - Responsive table with entity name, address, phone number
   - Material UI icons for call and WhatsApp actions
   - Status toggle (active/inactive)
 - **Notes System**: 
-  - Attach notes to schools
+  - Attach notes to entities
   - Add, edit, delete notes with author names and timestamps
   - Users can only edit/delete their own notes
 - **Responsive Design**: Mobile-first CSS with full responsiveness across devices
@@ -41,13 +42,14 @@ src/
 │   ├── LoginForm.tsx         # Login form component
 │   ├── UserManagement.tsx    # User CRUD operations
 │   ├── TaskManagement.tsx    # Task CRUD and status toggles
-│   ├── SchoolsManagement.tsx # Schools CRUD, Excel upload, action buttons
-│   └── NotesPanel.tsx        # School notes system
+│   ├── EntitiesManagement.tsx # Entities CRUD, Excel upload, action buttons
+│   └── NotesPanel.tsx        # Entity notes system
 ├── context/
 │   └── AuthContext.tsx       # Authentication context with localStorage
 ├── lib/
 │   ├── supabase.ts          # Supabase client initialization
 │   ├── types.ts             # TypeScript interfaces
+│   ├── config.ts            # Entity type configuration
 │   └── styles.ts            # Responsive style utilities
 └── styles/
     └── globals.css          # Comprehensive responsive CSS
@@ -169,9 +171,9 @@ Open [http://localhost:3000](http://localhost:3000)
 - Status tracking dropdown
 - Full CRUD operations
 
-### Schools Management
-- **Excel Upload**: Columns "School Name", "Address", "Phone Number"
-- **CRUD Operations**: Add, edit, delete schools
+### Entity Management
+- **Excel Upload**: Columns "Entity Name", "Address", "Phone Number"
+- **CRUD Operations**: Add, edit, delete entities
 - **Action Buttons**: Call and WhatsApp icons
 - **Status Toggle**: Active/inactive from table
 

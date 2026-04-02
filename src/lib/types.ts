@@ -17,8 +17,9 @@ export interface Task {
   updated_at: string;
 }
 
-export interface School {
+export interface Entity {
   id: string;
+  entity_type?: string; // e.g., 'school', 'interior', 'construction' (optional for backward compatibility)
   name: string;
   address: string;
   phone: string;

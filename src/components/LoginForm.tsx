@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import Image from "next/image";
 import styles from "./LoginForm.module.css";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase";
@@ -13,17 +14,18 @@ import {
   LockOutlined,
   WarningAmber,
 } from "@mui/icons-material";
+import LogoImage from "../../public/circle9logo.png"
 
 export default function LoginForm() {
-  const [email, setEmail]               = useState("");
-  const [password, setPassword]         = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [error, setError]               = useState("");
-  const [loading, setLoading]           = useState(false);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const router    = useRouter();
+  const router = useRouter();
   const { user, isLoading, setUser } = useAuth();
-  const supabase  = createClient();
+  const supabase = createClient();
 
   /* Redirect if already authenticated */
   useEffect(() => {
@@ -57,11 +59,11 @@ export default function LoginForm() {
       }
 
       const loggedInUser: User = {
-        id:              data.id,
-        email:           data.email,
-        name:            data.name,
-        role:            data.role,
-        created_at:      data.created_at,
+        id: data.id,
+        email: data.email,
+        name: data.name,
+        role: data.role,
+        created_at: data.created_at,
         assigned_number: data.assigned_number || null,
       };
 
@@ -82,7 +84,8 @@ export default function LoginForm() {
         {/* Brand mark */}
         <div className={styles.brandMark}>
           <div className={styles.logoRing}>
-            <LockOutlined className={styles.logoIcon} />
+            {/* <LockOutlined className={styles.logoIcon} /> */}
+            <Image src={LogoImage} alt="Logo" className={styles.logoIcon} />
           </div>
         </div>
 
