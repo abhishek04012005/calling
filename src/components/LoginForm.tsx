@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase";
 import { setAuthUser, useAuth } from "@/context/AuthContext";
 import { User } from "@/lib/types";
+import { FormSkeleton } from "@/components/SkeletonLoader";
 import {
   Visibility,
   VisibilityOff,
@@ -108,70 +109,75 @@ export default function LoginForm() {
           </div>
         )}
 
-        {/* Form */}
-        <form onSubmit={handleLogin} className={styles.form} noValidate>
-
-          {/* Email field */}
-          <div className={styles.field}>
-            <label htmlFor="email" className={styles.label}>
-              <MailOutline className={styles.labelIcon} />
-              Email address
-            </label>
-            <div className={styles.inputWrapper}>
-              <MailOutline className={styles.inputIcon} />
-              <input
-                id="email"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="you@company.com"
-                required
-                autoComplete="email"
-              />
-            </div>
+        {/* Form or Skeleton */}
+        {loading ? (
+          <div style={{ marginTop: "1.5rem" }}>
+            <FormSkeleton />
           </div>
+        ) : (
+          <form onSubmit={handleLogin} className={styles.form} noValidate>
 
-          {/* Password field */}
-          <div className={styles.field}>
-            <label htmlFor="password" className={styles.label}>
-              <LockOutlined className={styles.labelIcon} />
-              Password
-            </label>
-            <div className={styles.inputWrapper}>
-              <LockOutlined className={styles.inputIcon} />
-              <input
-                id="password"
-                type={showPassword ? "text" : "password"}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="Enter your password"
-                required
-                autoComplete="current-password"
-              />
-              <button
-                type="button"
-                className={styles.passwordToggle}
-                onClick={() => setShowPassword((v) => !v)}
-                aria-label={showPassword ? "Hide password" : "Show password"}
-              >
-                {showPassword ? <VisibilityOff /> : <Visibility />}
-              </button>
+            {/* Email field */}
+            <div className={styles.field}>
+              <label htmlFor="email" className={styles.label}>
+                <MailOutline className={styles.labelIcon} />
+                Email address
+              </label>
+              <div className={styles.inputWrapper}>
+                <MailOutline className={styles.inputIcon} />
+                <input
+                  id="email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="you@company.com"
+                  required
+                  autoComplete="email"
+                />
+              </div>
             </div>
-          </div>
 
-          {/* Submit */}
-          <button
-            type="submit"
-            disabled={loading}
-            className={styles.submitBtn}
-          >
-            <span className={styles.btnContent}>
-              {loading && <span className={styles.spinner} aria-hidden="true" />}
-              {loading ? "Authenticating…" : "Sign In"}
-            </span>
-          </button>
+            {/* Password field */}
+            <div className={styles.field}>
+              <label htmlFor="password" className={styles.label}>
+                <LockOutlined className={styles.labelIcon} />
+                Password
+              </label>
+              <div className={styles.inputWrapper}>
+                <LockOutlined className={styles.inputIcon} />
+                <input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Enter your password"
+                  required
+                  autoComplete="current-password"
+                />
+                <button
+                  type="button"
+                  className={styles.passwordToggle}
+                  onClick={() => setShowPassword((v) => !v)}
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                >
+                  {showPassword ? <VisibilityOff /> : <Visibility />}
+                </button>
+              </div>
+            </div>
 
-        </form>
+            {/* Submit */}
+            <button
+              type="submit"
+              disabled={loading}
+              className={styles.submitBtn}
+            >
+              <span className={styles.btnContent}>
+                Sign In
+              </span>
+            </button>
+
+          </form>
+        )}
 
         {/* Footer */}
         <p className={styles.footer}>

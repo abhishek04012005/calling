@@ -7,6 +7,7 @@ import { CURRENT_ENTITY_TYPE, ENTITY_TYPES } from "@/lib/config";
 import UserManagement from "@/components/UserManagement";
 import TaskManagement from "@/components/TaskManagement";
 import EntitiesManagement from "@/components/EntitiesManagement";
+import { PageSkeleton } from "@/components/SkeletonLoader";
 import {
   Logout,
   PeopleOutlined,
@@ -56,8 +57,7 @@ export default function Dashboard() {
   if (isLoading) {
     return (
       <div className={styles.loadingScreen}>
-        <div className={styles.spinnerRing} />
-        <p className={styles.loadingText}>Authenticating…</p>
+        <PageSkeleton />
       </div>
     );
   }

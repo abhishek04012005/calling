@@ -7,6 +7,7 @@ import { Entity, User } from "@/lib/types";
 import { useAuth } from "@/context/AuthContext";
 import * as XLSX from "xlsx";
 import { ENTITY_TYPES, CURRENT_ENTITY_TYPE } from "@/lib/config";
+import { TableRowSkeleton } from "@/components/SkeletonLoader";
 import {
   Delete,
   /* Edit removed */
@@ -211,7 +212,10 @@ export default function EntitiesManagement() {
       const fetchAllRows = perPage === -1;
       const pageSize = fetchAllRows ? currentTotal : perPage;
 
-      const dataQueryWithOrder = dataQuery.order("created_at", { ascending: false });
+      // Different sorting for admin vs user
+      const sortField = user.role === "admin" ? "created_at" : "name";
+      const sortAscending = user.role === "admin" ? false : true;
+      const dataQueryWithOrder = dataQuery.order(sortField, { ascending: sortAscending });
       const queryResult = fetchAllRows
         ? await dataQueryWithOrder
         : await dataQueryWithOrder.range((page - 1) * pageSize, (page * pageSize) - 1);
@@ -558,23 +562,41 @@ export default function EntitiesManagement() {
             <Search />
             <input
               value={searchText}
-              onChange={(e) => setSearchText(e.target.value)}
+              onChange={(e) => {
+                setSearchText(e.target.value);
+                setCurrentPage(1);
+              }}
               placeholder="Search"
             />
           </div>
           <select
             className={styles.filterSelect}
             value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
+            onChange={(e) => {
+              setStatusFilter(e.target.value);
+              setCurrentPage(1);
+            }}
           >
             <option value="">All Status</option>
-            <option value="new">New</option>
-            <option value="active">Active</option>
-            <option value="interested">Interested</option>
-            <option value="inactive">Inactive</option>
-            <option value="unassigned">Unassigned</option>
-            <option value="assigned">Assigned</option>
-            <option value="not_interested">Not Interested</option>
+            {user?.role === "admin" ? (
+              <>
+                <option value="new">New</option>
+                <option value="active">Active</option>
+                <option value="interested">Interested</option>
+                <option value="inactive">Inactive</option>
+                <option value="unassigned">Unassigned</option>
+                <option value="assigned">Assigned</option>
+                <option value="not_interested">Not Interested</option>
+                <option value="not_recieved">Not Received</option>
+              </>
+            ) : (
+              <>
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
+                <option value="not_interested">Not Interested</option>
+                <option value="not_recieved">Not Received</option>
+              </>
+            )}
           </select>
         </div>
 
@@ -644,11 +666,11 @@ export default function EntitiesManagement() {
             </thead>
             <tbody>
               {entitiesLoading ? (
-                <tr className={styles.loadingRow}>
-                  <td colSpan={8}>
-                    <CircularProgress size={22} style={{ color: "#c8a96e" }} />
-                  </td>
-                </tr>
+                <>
+                  <TableRowSkeleton />
+                  <TableRowSkeleton />
+                  <TableRowSkeleton />
+                </>
               ) : filteredEntities.length === 0 ? (
                 <tr>
                   <td colSpan={8}>
@@ -723,6 +745,7 @@ export default function EntitiesManagement() {
                           <option value="assigned">Assigned</option>
                           <option value="unassigned">Unassigned</option>
                           <option value="not_interested">Not Interested</option>
+                          <option value="not_recieved">Not Received</option>
                         </select>
                       ) : (
                         <select
@@ -731,9 +754,9 @@ export default function EntitiesManagement() {
                           onChange={(e) => handleStatusChange(entity, e.target.value as StatusKey)}
                         >
                           <option value="active">Active</option>
-                          <option value="interested">Interested</option>
                           <option value="inactive">Inactive</option>
                           <option value="not_interested">Not Interested</option>
+                          <option value="not_recieved">Not Received</option>
                         </select>
                       )}
                     </td>
@@ -917,12 +940,15 @@ export default function EntitiesManagement() {
                   <option value="inactive">Inactive</option>
                   <option value="unassigned">Unassigned</option>
                   <option value="assigned">Assigned</option>
+                  <option value="not_interested">Not Interested</option>
+                  <option value="not_recieved">Not Received</option>
                 </>
               ) : (
                 <>
                   <option value="active">Active</option>
-                  <option value="interested">Interested</option>
                   <option value="inactive">Inactive</option>
+                  <option value="not_interested">Not Interested</option>
+                  <option value="not_recieved">Not Received</option>
                 </>
               )}
             </TextField>
