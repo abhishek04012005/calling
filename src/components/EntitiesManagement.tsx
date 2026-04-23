@@ -7,6 +7,7 @@ import { Entity, User } from "@/lib/types";
 import { useAuth } from "@/context/AuthContext";
 import * as XLSX from "xlsx";
 import { ENTITY_TYPES, CURRENT_ENTITY_TYPE } from "@/lib/config";
+import { TableRowSkeleton } from "@/components/SkeletonLoader";
 import {
   Delete,
   /* Edit removed */
@@ -644,11 +645,11 @@ export default function EntitiesManagement() {
             </thead>
             <tbody>
               {entitiesLoading ? (
-                <tr className={styles.loadingRow}>
-                  <td colSpan={8}>
-                    <CircularProgress size={22} style={{ color: "#c8a96e" }} />
-                  </td>
-                </tr>
+                <>
+                  <TableRowSkeleton />
+                  <TableRowSkeleton />
+                  <TableRowSkeleton />
+                </>
               ) : filteredEntities.length === 0 ? (
                 <tr>
                   <td colSpan={8}>
