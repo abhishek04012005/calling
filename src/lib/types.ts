@@ -23,7 +23,7 @@ export interface Entity {
   name: string;
   address: string;
   phone: string;
-  status: "new" | "active" | "interested" | "inactive" | "unassigned" | "not_interested" | "assigned";
+  status: "new" | "active" | "interested" | "inactive" | "unassigned" | "not_interested" | "assigned" | "not_recieved";
   created_at: string;
   updated_at: string;
 }

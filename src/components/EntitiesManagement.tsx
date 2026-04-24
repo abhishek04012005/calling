@@ -55,7 +55,22 @@ function truncateAddress(address: string): string {
 /* ── Status helper type ─────────────────────────────── */
 type StatusKey =
   | "new" | "active" | "interested" | "inactive"
-  | "unassigned" | "assigned" | "not_interested";
+  | "unassigned" | "assigned" | "not_interested" | "not_recieved";
+
+/* ── Helper: get status color class ─────────────────── */
+function getStatusColorClass(status: string): string {
+  switch (status) {
+    case "active": return "statusActive";
+    case "inactive": return "statusInactive";
+    case "not_interested": return "statusNotInterested";
+    case "not_recieved": return "statusNotReceived";
+    case "new": return "statusNew";
+    case "interested": return "statusInterested";
+    case "assigned": return "statusAssigned";
+    case "unassigned": return "statusUnassigned";
+    default: return "";
+  }
+}
 
 /* ── Main Component ─────────────────────────────────── */
 export default function EntitiesManagement() {
@@ -733,7 +748,7 @@ export default function EntitiesManagement() {
                     <td className={styles.colStatus}>
                       {user?.role === "admin" ? (
                         <select
-                          className={styles.statusSelect}
+                          className={`${styles.statusSelect} ${styles[getStatusColorClass(entity.status)]}`}
                           value={entity.status}
                           disabled={statusUpdating === entity.id}
                           onChange={(e) => handleStatusChange(entity, e.target.value as StatusKey)}
@@ -749,7 +764,7 @@ export default function EntitiesManagement() {
                         </select>
                       ) : (
                         <select
-                          className={styles.statusSelect}
+                          className={`${styles.statusSelect} ${styles[getStatusColorClass(entity.status)]}`}
                           value={entity.status}
                           onChange={(e) => handleStatusChange(entity, e.target.value as StatusKey)}
                         >
