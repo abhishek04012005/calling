@@ -19,11 +19,11 @@ export interface Task {
 
 export interface Entity {
   id: string;
-  entity_type?: string; // e.g., 'school', 'interior', 'construction' (optional for backward compatibility)
+  entity_type?: string; 
   name: string;
   address: string;
   phone: string;
-  status: "new" | "active" | "interested" | "inactive" | "unassigned" | "not_interested" | "assigned" | "not_recieved";
+  status: "new" | "interested" | "unassigned" | "assigned" | "not_interested" | "not_recieved" | "unanswered" | "not_rechable";
   created_at: string;
   updated_at: string;
 }

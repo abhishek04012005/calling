@@ -90,7 +90,7 @@ CREATE TABLE schools (
   name VARCHAR(255) NOT NULL,
   address TEXT NOT NULL,
   phone VARCHAR(50) NOT NULL,
-  status VARCHAR(50) DEFAULT 'active' CHECK (status IN ('active', 'inactive')),
+  status VARCHAR(50) DEFAULT 'new' CHECK (status IN ('new', 'active', 'interested', 'inactive', 'not_interested', 'assigned', 'unanswered', 'not_rechable')),
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );

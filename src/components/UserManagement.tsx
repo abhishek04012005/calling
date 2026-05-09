@@ -13,6 +13,7 @@ import {
   ErrorOutline,
 } from "@mui/icons-material";
 import { Tooltip } from "@mui/material";
+import { useAuth } from "@/context/AuthContext";
 
 /* ── Helper: initials ────────────────────────────────── */
 function getInitials(name: string): string {
@@ -26,19 +27,20 @@ function getInitials(name: string): string {
 }
 
 export default function UserManagement() {
-  const [users, setUsers]             = useState<User[]>([]);
-  const [showForm, setShowForm]       = useState(false);
+  const [users, setUsers] = useState<User[]>([]);
+  const [showForm, setShowForm] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
-  const [formData, setFormData]       = useState({
+  const [formData, setFormData] = useState({
     name: "",
     email: "",
     password: "",
     role: "user" as "admin" | "user",
     assigned_number: "",
   });
-  const [loading, setLoading]   = useState(false);
-  const [message, setMessage]   = useState("");
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState("");
   const supabase = createClient();
+  const { user: currentUser } = useAuth();
 
   /* auto-dismiss message */
   useEffect(() => {
@@ -66,6 +68,10 @@ export default function UserManagement() {
   /* ── Submit ──────────────────────────────────────── */
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (currentUser?.role !== "admin") {
+      setMessage("Only admins can manage users");
+      return;
+    }
     setLoading(true);
     setMessage("");
 
@@ -74,9 +80,9 @@ export default function UserManagement() {
         const { error } = await supabase
           .from("users")
           .update({
-            name:            formData.name,
-            email:           formData.email,
-            role:            formData.role,
+            name: formData.name,
+            email: formData.email,
+            role: formData.role,
             assigned_number: formData.assigned_number || null,
             ...(formData.password && { password: formData.password }),
           })
@@ -85,10 +91,10 @@ export default function UserManagement() {
         setMessage("User updated successfully");
       } else {
         const { error } = await supabase.from("users").insert({
-          name:            formData.name,
-          email:           formData.email,
-          password:        formData.password,
-          role:            formData.role,
+          name: formData.name,
+          email: formData.email,
+          password: formData.password,
+          role: formData.role,
           assigned_number: formData.assigned_number || null,
         });
         if (error) throw error;
@@ -107,6 +113,10 @@ export default function UserManagement() {
 
   /* ── Delete ──────────────────────────────────────── */
   const handleDelete = async (userId: string) => {
+    if (currentUser?.role !== "admin") {
+      setMessage("Only admins can delete users");
+      return;
+    }
     if (!confirm("Are you sure you want to delete this user?")) return;
     try {
       const { error } = await supabase.from("users").delete().eq("id", userId);
@@ -123,10 +133,10 @@ export default function UserManagement() {
   const handleEdit = (user: User) => {
     setEditingUser(user);
     setFormData({
-      name:            user.name,
-      email:           user.email,
-      password:        "",
-      role:            user.role,
+      name: user.name,
+      email: user.email,
+      password: "",
+      role: user.role,
       assigned_number: user.assigned_number || "",
     });
     setShowForm(true);
@@ -154,16 +164,18 @@ export default function UserManagement() {
             <h2 className={styles.pageTitle}>User Management</h2>
           </div>
 
-          <button
-            className={styles.btnPrimary}
-            onClick={() => {
-              if (showForm && !editingUser) { resetForm(); }
-              else { resetForm(); setShowForm(true); }
-            }}
-          >
-            <Add style={{ fontSize: "0.95rem" }} />
-            {showForm && !editingUser ? "Cancel" : "Add User"}
-          </button>
+          {currentUser?.role === "admin" && (
+            <button
+              className={styles.btnPrimary}
+              onClick={() => {
+                if (showForm && !editingUser) { resetForm(); }
+                else { resetForm(); setShowForm(true); }
+              }}
+            >
+              <Add style={{ fontSize: "0.95rem" }} />
+              {showForm && !editingUser ? "Cancel" : "Add User"}
+            </button>
+          )}
         </div>
 
         {/* Alert */}
@@ -326,31 +338,33 @@ export default function UserManagement() {
 
                     {/* Actions */}
                     <td className={styles.colActions}>
-                      <Tooltip title="Edit user">
-                        <button
-                          className={`${styles.actionBtn} ${styles.actionBtnEdit}`}
-                          onClick={() => handleEdit(user)}
-                        >
-                          <Edit style={{ fontSize: "0.95rem" }} />
-                        </button>
-                      </Tooltip>
-                      <Tooltip title="Delete user">
-                        <button
-                          className={`${styles.actionBtn} ${styles.actionBtnDelete}`}
-                          onClick={() => handleDelete(user.id)}
-                        >
-                          <Delete style={{ fontSize: "0.95rem" }} />
-                        </button>
-                      </Tooltip>
+                      {currentUser?.role === "admin" && (
+                        <Tooltip title="Edit user">
+                          <button
+                            className={`${styles.actionBtn} ${styles.actionBtnEdit}`}
+                            onClick={() => handleEdit(user)}
+                          >
+                            <Edit style={{ fontSize: "0.95rem" }} />
+                          </button>
+                        </Tooltip>
+                      )}
+                      {currentUser?.role === "admin" && (
+                        <Tooltip title="Delete user">
+                          <button
+                            className={`${styles.actionBtn} ${styles.actionBtnDelete}`}
+                            onClick={() => handleDelete(user.id)}
+                          >
+                            <Delete style={{ fontSize: "0.95rem" }} />
+                          </button>
+                        </Tooltip>
+                      )}
                     </td>
-
                   </tr>
                 ))}
               </tbody>
             </table>
           )}
         </div>
-
       </div>
     </div>
   );

@@ -54,16 +54,17 @@ function truncateAddress(address: string): string {
 
 /* ── Status helper type ─────────────────────────────── */
 type StatusKey =
-  | "new" | "active" | "interested" | "inactive"
-  | "unassigned" | "assigned" | "not_interested" | "not_recieved";
+  | "new" | "interested" | "unassigned"
+  | "assigned" | "not_interested" | "not_recieved"
+  | "unanswered" | "not_rechable";
 
 /* ── Helper: get status color class ─────────────────── */
 function getStatusColorClass(status: string): string {
   switch (status) {
-    case "active": return "statusActive";
-    case "inactive": return "statusInactive";
     case "not_interested": return "statusNotInterested";
     case "not_recieved": return "statusNotReceived";
+    case "unanswered": return "statusNotReceived";
+    case "not_rechable": return "statusNotReceived";
     case "new": return "statusNew";
     case "interested": return "statusInterested";
     case "assigned": return "statusAssigned";
@@ -74,23 +75,23 @@ function getStatusColorClass(status: string): string {
 
 /* ── Main Component ─────────────────────────────────── */
 export default function EntitiesManagement() {
-  const [entities, setEntities]               = useState<Entity[]>([]);
-  const [noteCounts, setNoteCounts]         = useState<Record<string, number>>({});
+  const [entities, setEntities] = useState<Entity[]>([]);
+  const [noteCounts, setNoteCounts] = useState<Record<string, number>>({});
   const [entitiesLoading, setEntitiesLoading] = useState(false);
   const [hasEntityTypeColumn, setHasEntityTypeColumn] = useState<boolean>(false);
-  const [totalCount, setTotalCount]         = useState<number>(0);
-  const [currentPage, setCurrentPage]       = useState<number>(1);
-  const [itemsPerPage, setItemsPerPage]     = useState<number>(20);
+  const [totalCount, setTotalCount] = useState<number>(0);
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [itemsPerPage, setItemsPerPage] = useState<number>(20);
 
   const effectiveItemsPerPage = itemsPerPage === -1 ? totalCount || 1 : itemsPerPage;
   const totalPages = effectiveItemsPerPage > 0 ? Math.max(1, Math.ceil(totalCount / effectiveItemsPerPage)) : 1;
   const displayStart = totalCount === 0 ? 0 : (currentPage - 1) * effectiveItemsPerPage + 1;
   const displayEnd = totalCount === 0 ? 0 : Math.min(currentPage * effectiveItemsPerPage, totalCount);
-  const [showUpload, setShowUpload]         = useState(false);
-  const [showForm, setShowForm]             = useState(false);
-  const [editingEntity, setEditingEntity]   = useState<Entity | null>(null);
-  const [searchText, setSearchText]         = useState("");
-  const [statusFilter, setStatusFilter]     = useState<string>("");
+  const [showUpload, setShowUpload] = useState(false);
+  const [showForm, setShowForm] = useState(false);
+  const [editingEntity, setEditingEntity] = useState<Entity | null>(null);
+  const [searchText, setSearchText] = useState("");
+  const [statusFilter, setStatusFilter] = useState<string>("");
 
   // Assignment-related data (used for bulk assignments)
   const [allUsers, setAllUsers] = useState<User[]>([]);
@@ -98,19 +99,19 @@ export default function EntitiesManagement() {
 
   // Bulk
   const [selectedEntityIds, setSelectedEntityIds] = useState<string[]>([]);
-  const [showBulkModal, setShowBulkModal]         = useState(false);
+  const [showBulkModal, setShowBulkModal] = useState(false);
   const [bulkAssignedUsers, setBulkAssignedUsers] = useState<string[]>([]);
-  const [bulkLoading, setBulkLoading]             = useState(false);
+  const [bulkLoading, setBulkLoading] = useState(false);
 
   // Form
   const [formData, setFormData] = useState({
     name: "", address: "", phone: "", status: "new",
   });
-  const [loading, setLoading]   = useState(false);
-  const [message, setMessage]   = useState("");
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState("");
 
   // Notes
-  const [notesEntityId, setNotesEntityId]     = useState<string | null>(null);
+  const [notesEntityId, setNotesEntityId] = useState<string | null>(null);
   const [notesEntityName, setNotesEntityName] = useState<string>("");
 
   // Status update guard
@@ -199,7 +200,7 @@ export default function EntitiesManagement() {
             if (assignedIds.length === 0 && !user.assigned_number) {
               setEntities([]); setTotalCount(0); setEntitiesLoading(false); return;
             }
-            
+
             if (user.assigned_number) {
               const phoneVal = user.assigned_number.replace(/'/g, "''");
               const filterCondition = assignedIds.length > 0
@@ -227,10 +228,10 @@ export default function EntitiesManagement() {
       const fetchAllRows = perPage === -1;
       const pageSize = fetchAllRows ? currentTotal : perPage;
 
-      // Different sorting for admin vs user
-      const sortField = user.role === "admin" ? "created_at" : "name";
-      const sortAscending = user.role === "admin" ? false : true;
-      const dataQueryWithOrder = dataQuery.order(sortField, { ascending: sortAscending });
+      // Sort by status first, then by creation date
+      const dataQueryWithOrder = dataQuery
+        .order("status", { ascending: true })
+        .order("created_at", { ascending: false });
       const queryResult = fetchAllRows
         ? await dataQueryWithOrder
         : await dataQueryWithOrder.range((page - 1) * pageSize, (page * pageSize) - 1);
@@ -295,9 +296,9 @@ export default function EntitiesManagement() {
           const rows = XLSX.utils.sheet_to_json(ws);
           const parsed: ParsedEntity[] = (rows as any[])
             .map((r) => ({
-              name:    r[entityConfig.excelColumns[0]] || r["name"] || "",
+              name: r[entityConfig.excelColumns[0]] || r["name"] || "",
               address: r[entityConfig.excelColumns[1]] || r["address"] || "",
-              phone:   String(r[entityConfig.excelColumns[2]] || r["phone"] || "").trim(),
+              phone: String(r[entityConfig.excelColumns[2]] || r["phone"] || "").trim(),
             }))
             .filter((e) => e.name && e.address && e.phone);
 
@@ -318,18 +319,18 @@ export default function EntitiesManagement() {
           });
 
           if (!toInsert.length) throw new Error("All phone numbers already exist");
-          
+
           // Prepare insert data - only include entity_type if column exists
           const insertData = toInsert.map((e) => {
-            const baseData = { 
-              name: e.name, 
-              address: e.address, 
-              phone: e.phone, 
-              status: "new" as const 
+            const baseData = {
+              name: e.name,
+              address: e.address,
+              phone: e.phone,
+              status: "new" as const
             };
             return hasEntityTypeColumn ? { ...baseData, entity_type: CURRENT_ENTITY_TYPE } : baseData;
           });
-          
+
           const { error: ins } = await supabase.from("schools").insert(insertData);
           if (ins) throw ins;
 
@@ -350,24 +351,36 @@ export default function EntitiesManagement() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault(); setLoading(true); setMessage("");
     try {
+      const isAdmin = user?.role === "admin";
+      const statusToSave = isAdmin
+        ? formData.status || editingEntity?.status || "new"
+        : editingEntity?.status || "new";
+
       if (editingEntity) {
-        const { error } = await supabase.from("schools").update({
-          name: formData.name, address: formData.address,
-          phone: formData.phone, status: formData.status || editingEntity.status,
+        const updateData: Record<string, any> = {
+          name: formData.name,
+          address: formData.address,
+          phone: formData.phone,
           updated_at: new Date().toISOString(),
-        }).eq("id", editingEntity.id);
+        };
+
+        if (isAdmin) {
+          updateData.status = statusToSave;
+        }
+
+        const { error } = await supabase.from("schools").update(updateData).eq("id", editingEntity.id);
         if (error) throw error;
         setMessage(`${entityConfig.label} updated successfully`);
       } else {
         // Prepare insert data - only include entity_type if column exists
         const insertData = {
-          name: formData.name, 
+          name: formData.name,
           address: formData.address,
-          phone: formData.phone, 
-          status: formData.status || "new",
+          phone: formData.phone,
+          status: statusToSave,
         };
         const finalInsertData = hasEntityTypeColumn ? { ...insertData, entity_type: CURRENT_ENTITY_TYPE } : insertData;
-        
+
         const { error } = await supabase.from("schools").insert(finalInsertData);
         if (error) throw error;
         setMessage(`${entityConfig.label} created successfully`);
@@ -387,7 +400,7 @@ export default function EntitiesManagement() {
 
   const resetForm = () => {
     setShowForm(false); setEditingEntity(null);
-    setFormData({ name: "", address: "", phone: "", status: user?.role === "admin" ? "new" : "active" });
+    setFormData({ name: "", address: "", phone: "", status: "new" });
   };
 
   /* ── Contact actions ──────────────────────────────── */
@@ -435,6 +448,10 @@ export default function EntitiesManagement() {
 
   /* ── Confirmed delete ──────────────────────────────── */
   const confirmDelete = async () => {
+    if (user?.role !== "admin") {
+      setMessage("Only admins can delete entities");
+      return;
+    }
     setLoading(true);
     try {
       if (deleteModal.type === 'single' && deleteModal.entityId) {
@@ -476,6 +493,15 @@ export default function EntitiesManagement() {
 
   /* ── Status inline update ─────────────────────────── */
   const handleStatusChange = async (entity: Entity, val: StatusKey) => {
+    const isAdmin = user?.role === "admin";
+    const allowedUserStatuses: StatusKey[] = [
+      "new", "interested", "not_interested", "unanswered", "not_rechable"
+    ];
+
+    if (!isAdmin && !allowedUserStatuses.includes(val)) {
+      setMessage("Only admins can assign or unassign entities");
+      return;
+    }
     if (statusUpdating === entity.id) return;
     setStatusUpdating(entity.id);
     const prev = entity.status;
@@ -485,11 +511,15 @@ export default function EntitiesManagement() {
         .update({ status: val, updated_at: new Date().toISOString() }).eq("id", entity.id);
       if (error) {
         setEntities((p) => p.map((s) => s.id === entity.id ? { ...s, status: prev } : s));
-        setMessage("Error updating status");
+        const messageText = error.message || "Error updating status";
+        setMessage(`Error updating status: ${messageText}`);
+        console.error("Status update error:", error);
       }
-    } catch {
+    } catch (err) {
       setEntities((p) => p.map((s) => s.id === entity.id ? { ...s, status: prev } : s));
-      setMessage("Error updating status");
+      const messageText = err instanceof Error ? err.message : JSON.stringify(err);
+      setMessage(`Error updating status: ${messageText}`);
+      console.error("Status update exception:", err);
     } finally {
       setStatusUpdating(null);
     }
@@ -497,7 +527,7 @@ export default function EntitiesManagement() {
 
   /* ── Filtered list ────────────────────────────────── */
   const filteredEntities = entities.filter((s) => {
-    const matchesName   = s.name.toLowerCase().includes(searchText.toLowerCase());
+    const matchesName = s.name.toLowerCase().includes(searchText.toLowerCase());
     const matchesStatus = statusFilter ? s.status === statusFilter : true;
     return matchesName && matchesStatus;
   });
@@ -596,59 +626,55 @@ export default function EntitiesManagement() {
             {user?.role === "admin" ? (
               <>
                 <option value="new">New</option>
-                <option value="active">Active</option>
                 <option value="interested">Interested</option>
-                <option value="inactive">Inactive</option>
+                <option value="not_interested">Not Interested</option>
+                <option value="unanswered">Unanswered</option>
+                <option value="not_rechable">Not Rechable</option>
                 <option value="unassigned">Unassigned</option>
                 <option value="assigned">Assigned</option>
-                <option value="not_interested">Not Interested</option>
-                <option value="not_recieved">Not Received</option>
               </>
             ) : (
               <>
-                <option value="active">Active</option>
-                <option value="inactive">Inactive</option>
+                <option value="new">New</option>
+                <option value="interested">Interested</option>
                 <option value="not_interested">Not Interested</option>
-                <option value="not_recieved">Not Received</option>
+                <option value="unanswered">Unanswered</option>
+                <option value="not_rechable">Not Rechable</option>
               </>
             )}
           </select>
         </div>
 
         {/* Bulk bar */}
-        {selectedEntityIds.length > 0 && (
+        {selectedEntityIds.length > 0 && user?.role === "admin" && (
           <div className={styles.bulkBar}>
             <span className={styles.bulkCount}>{selectedEntityIds.length} selected</span>
             <div className={styles.bulkActions}>
-              {user?.role === "admin" && (
-                <>
-                  <button
-                    className={styles.btnOutline}
-                    onClick={async () => {
-                      setShowBulkModal(true); setBulkLoading(true);
-                      try {
-                        const { data } = await supabase
-                          .from("user_school_assignments")
-                          .select("user_id, school_id")
-                          .in("school_id", selectedEntityIds);
-                        const countMap: Record<string, number> = {};
-                        (data || []).forEach((r: any) => {
-                          countMap[r.user_id] = (countMap[r.user_id] || 0) + 1;
-                        });
-                        setBulkAssignedUsers(
-                          allUsers.filter((u) => countMap[u.id] === selectedEntityIds.length).map((u) => u.id)
-                        );
-                      } catch { setMessage("Error loading assignments"); }
-                      finally { setBulkLoading(false); }
-                    }}
-                  >
-                    <GroupAdd fontSize="small" /> Assign Users
-                  </button>
-                  <button className={styles.btnOutline} onClick={handleBulkUnassignAll} disabled={loading}>
-                    <GroupRemove fontSize="small" /> Unassign All
-                  </button>
-                </>
-              )}
+              <button
+                className={styles.btnOutline}
+                onClick={async () => {
+                  setShowBulkModal(true); setBulkLoading(true);
+                  try {
+                    const { data } = await supabase
+                      .from("user_school_assignments")
+                      .select("user_id, school_id")
+                      .in("school_id", selectedEntityIds);
+                    const countMap: Record<string, number> = {};
+                    (data || []).forEach((r: any) => {
+                      countMap[r.user_id] = (countMap[r.user_id] || 0) + 1;
+                    });
+                    setBulkAssignedUsers(
+                      allUsers.filter((u) => countMap[u.id] === selectedEntityIds.length).map((u) => u.id)
+                    );
+                  } catch { setMessage("Error loading assignments"); }
+                  finally { setBulkLoading(false); }
+                }}
+              >
+                <GroupAdd fontSize="small" /> Assign Users
+              </button>
+              <button className={styles.btnOutline} onClick={handleBulkUnassignAll} disabled={loading}>
+                <GroupRemove fontSize="small" /> Unassign All
+              </button>
               <button className={styles.btnDanger} onClick={handleBulkDelete} disabled={loading}>
                 <Delete fontSize="small" /> Delete
               </button>
@@ -661,15 +687,17 @@ export default function EntitiesManagement() {
           <table className={styles.table}>
             <thead>
               <tr>
-                <th className={styles.colCheckbox}>
-                  <input
-                    type="checkbox" className={styles.checkbox}
-                    checked={allChecked}
-                    onChange={(e) =>
-                      setSelectedEntityIds(e.target.checked ? filteredEntities.map((e) => e.id) : [])
-                    }
-                  />
-                </th>
+                {user?.role === "admin" && (
+                  <th className={styles.colCheckbox}>
+                    <input
+                      type="checkbox" className={styles.checkbox}
+                      checked={allChecked}
+                      onChange={(e) =>
+                        setSelectedEntityIds(e.target.checked ? filteredEntities.map((e) => e.id) : [])
+                      }
+                    />
+                  </th>
+                )}
                 <th className={styles.colNo}>No.</th>
                 <th className={styles.colName}>Name</th>
                 <th className={styles.colAddress}>Address</th>
@@ -688,7 +716,7 @@ export default function EntitiesManagement() {
                 </>
               ) : filteredEntities.length === 0 ? (
                 <tr>
-                  <td colSpan={8}>
+                  <td colSpan={user?.role === "admin" ? 8 : 7}>
                     <div className={styles.emptyState}>
                       No Data found
                     </div>
@@ -700,18 +728,19 @@ export default function EntitiesManagement() {
                     key={entity.id}
                     className={selectedEntityIds.includes(entity.id) ? styles.rowSelected : ""}
                   >
-                    {/* Checkbox */}
-                    <td className={styles.colCheckbox}>
-                      <input
-                        type="checkbox" className={styles.checkbox}
-                        checked={selectedEntityIds.includes(entity.id)}
-                        onChange={(e) =>
-                          setSelectedEntityIds((p) =>
-                            e.target.checked ? [...p, entity.id] : p.filter((id) => id !== entity.id)
-                          )
-                        }
-                      />
-                    </td>
+                    {user?.role === "admin" && (
+                      <td className={styles.colCheckbox}>
+                        <input
+                          type="checkbox" className={styles.checkbox}
+                          checked={selectedEntityIds.includes(entity.id)}
+                          onChange={(e) =>
+                            setSelectedEntityIds((p) =>
+                              e.target.checked ? [...p, entity.id] : p.filter((id) => id !== entity.id)
+                            )
+                          }
+                        />
+                      </td>
+                    )}
 
                     {/* No */}
                     <td className={styles.colNo}>{(currentPage - 1) * effectiveItemsPerPage + idx + 1}</td>
@@ -746,34 +775,24 @@ export default function EntitiesManagement() {
 
                     {/* Status */}
                     <td className={styles.colStatus}>
-                      {user?.role === "admin" ? (
-                        <select
-                          className={`${styles.statusSelect} ${styles[getStatusColorClass(entity.status)]}`}
-                          value={entity.status}
-                          disabled={statusUpdating === entity.id}
-                          onChange={(e) => handleStatusChange(entity, e.target.value as StatusKey)}
-                        >
-                          <option value="new">New</option>
-                          <option value="active">Active</option>
-                          <option value="interested">Interested</option>
-                          <option value="inactive">Inactive</option>
-                          <option value="assigned">Assigned</option>
-                          <option value="unassigned">Unassigned</option>
-                          <option value="not_interested">Not Interested</option>
-                          <option value="not_recieved">Not Received</option>
-                        </select>
-                      ) : (
-                        <select
-                          className={`${styles.statusSelect} ${styles[getStatusColorClass(entity.status)]}`}
-                          value={entity.status}
-                          onChange={(e) => handleStatusChange(entity, e.target.value as StatusKey)}
-                        >
-                          <option value="active">Active</option>
-                          <option value="inactive">Inactive</option>
-                          <option value="not_interested">Not Interested</option>
-                          <option value="not_recieved">Not Received</option>
-                        </select>
-                      )}
+                      <select
+                        className={`${styles.statusSelect} ${styles[getStatusColorClass(entity.status)]}`}
+                        value={entity.status}
+                        disabled={statusUpdating === entity.id}
+                        onChange={(e) => handleStatusChange(entity, e.target.value as StatusKey)}
+                      >
+                        <option value="new">New</option>
+                        <option value="interested">Interested</option>
+                        <option value="not_interested">Not Interested</option>
+                        <option value="unanswered">Unanswered</option>
+                        <option value="not_rechable">Not Rechable</option>
+                        {user?.role === "admin" && (
+                          <>
+                            <option value="unassigned">Unassigned</option>
+                            <option value="assigned">Assigned</option>
+                          </>
+                        )}
+                      </select>
                     </td>
 
                     {/* Actions */}
@@ -803,12 +822,14 @@ export default function EntitiesManagement() {
                         </button>
                       </Tooltip>
 
-                      {/* Delete always visible */}
-                      <Tooltip title="Delete">
-                        <button className={`${styles.actionBtn} ${styles.delete}`} onClick={() => handleDelete(entity.id, entity.name)}>
-                          <Delete style={{ fontSize: "0.95rem" }} />
-                        </button>
-                      </Tooltip>
+                      {/* Delete for admins only */}
+                      {user?.role === "admin" && (
+                        <Tooltip title="Delete">
+                          <button className={`${styles.actionBtn} ${styles.delete}`} onClick={() => handleDelete(entity.id, entity.name)}>
+                            <Delete style={{ fontSize: "0.95rem" }} />
+                          </button>
+                        </Tooltip>
+                      )}
                     </td>
                   </tr>
                 ))
@@ -896,7 +917,7 @@ export default function EntitiesManagement() {
           <button className={styles.btnOutline} onClick={() => setAddressPopup(null)}>
             Close
           </button>
-          <button className={styles.btnPrimary} 
+          <button className={styles.btnPrimary}
             onClick={() => window.open(`https://maps.google.com?q=${encodeURIComponent(addressPopup?.address || "")}`, "_blank")}>
             <LocationOn style={{ fontSize: "0.9rem" }} /> Open Maps
           </button>
@@ -931,6 +952,7 @@ export default function EntitiesManagement() {
                 }}
               />
             ))}
+            {user?.role === "admin" ? (
             <TextField
               select label="Status" value={formData.status}
               onChange={(e) => setFormData({ ...formData, status: e.target.value })}
@@ -947,26 +969,32 @@ export default function EntitiesManagement() {
                 "& option": { background: "#1a2236" },
               }}
             >
-              {user?.role === "admin" ? (
-                <>
-                  <option value="new">New</option>
-                  <option value="active">Active</option>
-                  <option value="interested">Interested</option>
-                  <option value="inactive">Inactive</option>
-                  <option value="unassigned">Unassigned</option>
-                  <option value="assigned">Assigned</option>
-                  <option value="not_interested">Not Interested</option>
-                  <option value="not_recieved">Not Received</option>
-                </>
-              ) : (
-                <>
-                  <option value="active">Active</option>
-                  <option value="inactive">Inactive</option>
-                  <option value="not_interested">Not Interested</option>
-                  <option value="not_recieved">Not Received</option>
-                </>
-              )}
+              <option value="new">New</option>
+              <option value="interested">Interested</option>
+              <option value="not_interested">Not Interested</option>
+              <option value="unanswered">Unanswered</option>
+              <option value="not_rechable">Not Rechable</option>
+              <option value="unassigned">Unassigned</option>
+              <option value="assigned">Assigned</option>
             </TextField>
+          ) : (
+            <TextField
+              label="Status"
+              value={formData.status}
+              disabled
+              fullWidth margin="dense"
+              sx={{
+                "& .MuiOutlinedInput-root": {
+                  color: "#f0ece4", background: "rgba(255,255,255,0.04)",
+                  "& fieldset": { borderColor: "rgba(255,255,255,0.09)" },
+                  "&:hover fieldset": { borderColor: "rgba(200,169,110,0.35)" },
+                  "&.Mui-focused fieldset": { borderColor: "#c8a96e" },
+                },
+                "& .MuiInputLabel-root": { color: "#6b7280" },
+                "& .MuiInputLabel-root.Mui-focused": { color: "#c8a96e" },
+              }}
+            />
+          )}
           </DialogContent>
           <DialogActions sx={{ background: "#1a2236", borderTop: "1px solid rgba(255,255,255,0.07)", px: 2, py: 1.2 }}>
             <button type="button" className={styles.btnOutline} onClick={resetForm}>Cancel</button>
@@ -1027,9 +1055,9 @@ export default function EntitiesManagement() {
           <button className={styles.btnOutline} onClick={() => setDeleteModal({ open: false, type: 'single' })}>
             Cancel
           </button>
-          <button 
-            className={styles.btnDanger} 
-            onClick={confirmDelete} 
+          <button
+            className={styles.btnDanger}
+            onClick={confirmDelete}
             disabled={loading}
           >
             {loading ? "Deleting…" : "Delete"}

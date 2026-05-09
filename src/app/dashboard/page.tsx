@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useAuth, setAuthUser } from "@/context/AuthContext";
 import { CURRENT_ENTITY_TYPE, ENTITY_TYPES } from "@/lib/config";
@@ -106,10 +107,7 @@ export default function Dashboard() {
         {/* Brand */}
         <div className={styles.brand}>
           <div className={styles.brandIcon}>
-            {user.role === "admin"
-              ? <AdminPanelSettingsOutlined style={{ fontSize: "1.1rem" }} />
-              : <DashboardOutlined         style={{ fontSize: "1.1rem" }} />
-            }
+            <Image src="/circle9logo.png" alt="Circle9 logo" width={40} height={40} priority />
           </div>
           <div className={styles.brandText}>
             <p className={styles.brandTitle}>
